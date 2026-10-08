@@ -1463,7 +1463,8 @@ var L = window.ClockStudioLang = {
       credit_copy: 'クレジットをコピー',
       credit_copied: 'クレジットをコピーしました',
       credit_box_aria: 'コピー用のクレジット文',
-      credit_rt: '告知ポストのリポスト (RT) でも OK です。',
+      credit_rt: '{link}のリポスト (RT) でも OK です。',
+      credit_rt_link: '告知ポスト',
       credit_paid: '有料版はクレジット不要',
       credit_close: '閉じる',
 
@@ -1491,6 +1492,7 @@ var L = window.ClockStudioLang = {
       size_note_estimate: 'おおよその目安です (プレビューの計測が終わると正確な値に変わります)。',
       howto_h_noconfig: '設定を変えずに、そのまま使うなら',
       howto_noconfig: 'OBS のブラウザソースで「ローカルファイル」にチェックを入れ、このフォルダの clock.html を選ぶだけで、標準のデザイン (プレーン) の時計が出ます。(幅・高さの目安: 幅 350 × 高さ 130)',
+      howto_noconfig_web: 'OBS のブラウザソースの URL 欄に {url} を貼るだけで、標準のデザイン (プレーン) の時計が出ます。(幅・高さの目安: 幅 350 × 高さ 130)',
       howto_h_later: 'あとで設定を変えたいとき',
       howto_later: 'この画面の「{link}」に OBS に貼ってある URL を貼ると、そのときの設定から続きを直せます。直したら、URL をコピーし直して OBS に貼り直します。',
       howto_h_trouble: 'うまくいかないとき',
@@ -1502,6 +1504,9 @@ var L = window.ClockStudioLang = {
       trouble_3_a: 'フォントはインターネットから読み込みます。ネットにつながっていないと、代わりのフォントで表示されます。つながっている状態で、ブラウザソースの「現在のページのキャッシュを更新」を押してみてください。',
       trouble_4_q: 'フォルダを動かしたら表示されなくなった',
       trouble_4_a: 'URL にはファイルの置き場所が入っています。フォルダを動かしたり名前を変えたりしたときは、この設定画面を開き直して URL を作り直し、OBS に貼り直してください。',
+      trouble_4_q_web: '配信中に時計が消えた / 表示されない',
+      trouble_4_a_web: 'Web 版はインターネット経由で読み込みます。回線が切れていると表示されません。手元のファイルで動かしたい場合は {link} をどうぞ。',
+      trouble_4_link_web: 'BOOTH の ZIP 版 (無料)',
 
       /* --- URL から読み込む (ダイアログ) --- */
       import_title: 'OBS に貼ってある URL から設定を読み込む',
@@ -1771,7 +1776,8 @@ var L = window.ClockStudioLang = {
       credit_copy: 'Copy credit',
       credit_copied: 'Credit copied',
       credit_box_aria: 'Credit text to copy',
-      credit_rt: 'Reposting (RT) the announcement post is also fine.',
+      credit_rt: 'Reposting (RT) the {link} is also fine.',
+      credit_rt_link: 'announcement post',
       credit_paid: 'The full version needs no credit',
       credit_close: 'Close',
 
@@ -1798,6 +1804,7 @@ var L = window.ClockStudioLang = {
       size_note_estimate: 'Rough estimate (it updates to the exact value once the preview is measured).',
       howto_h_noconfig: 'Using it as is, without settings',
       howto_noconfig: 'In the OBS Browser source, check “Local file” and select clock.html in this folder. The clock appears in the default design (Plain). (Suggested size: Width 350 × Height 130)',
+      howto_noconfig_web: 'Just paste {url} into the URL field of an OBS Browser source. The clock appears in the default design (Plain). (Suggested size: Width 350 × Height 130)',
       howto_h_later: 'Changing settings later',
       howto_later: 'Paste the URL from OBS into “{link}” on this page to pick up where you left off. After editing, copy the URL again and paste it into OBS.',
       howto_h_trouble: 'Troubleshooting',
@@ -1809,6 +1816,9 @@ var L = window.ClockStudioLang = {
       trouble_3_a: 'Fonts are loaded from the internet. When offline, a fallback font is shown. Once you are online, try “Refresh cache of current page” in the Browser source.',
       trouble_4_q: 'The clock disappeared after moving the folder',
       trouble_4_a: 'The URL contains the file location. If you move or rename the folder, reopen this settings page, copy a new URL and paste it into OBS again.',
+      trouble_4_q_web: 'The clock disappeared or does not show during a stream',
+      trouble_4_a_web: 'The web version loads over the internet, so it will not show while your connection is down. To run it from files on your PC, use the {link}.',
+      trouble_4_link_web: 'ZIP version on BOOTH (free)',
 
       import_title: 'Load settings from the URL in OBS',
       import_body: 'Paste the URL copied from the Browser source\'s URL field to load those settings and keep editing. Your current settings will be replaced (you can undo with “Undo” after loading). After editing, copy the URL again and paste it into OBS.',
@@ -2076,7 +2086,8 @@ var L = window.ClockStudioLang = {
       credit_copy: '複製出處文字',
       credit_copied: '已複製出處文字',
       credit_box_aria: '可複製的出處文字',
-      credit_rt: '轉發 (RT) 宣傳貼文也可以。',
+      credit_rt: '轉發 (RT) {link}也可以。',
+      credit_rt_link: '宣傳貼文',
       credit_paid: '付費版免標註出處',
       credit_close: '關閉',
 
@@ -2103,6 +2114,7 @@ var L = window.ClockStudioLang = {
       size_note_estimate: '這是大概的參考值 (預覽量測完成後會變成準確的數值)。',
       howto_h_noconfig: '不改設定，直接使用',
       howto_noconfig: '在 OBS 的瀏覽器來源勾選「本機檔案」，選擇這個資料夾裡的 clock.html，就會顯示預設設計 (基本) 的時鐘。(建議尺寸：寬度 350 × 高度 130)',
+      howto_noconfig_web: '只要在 OBS 瀏覽器來源的網址欄位貼上 {url}，就會顯示預設設計 (基本) 的時鐘。(建議尺寸：寬度 350 × 高度 130)',
       howto_h_later: '之後想更改設定時',
       howto_later: '把貼在 OBS 的網址貼到這個畫面的「{link}」，就能從當時的設定繼續修改。改好後，請重新複製網址並貼到 OBS。',
       howto_h_trouble: '遇到問題時',
@@ -2114,6 +2126,9 @@ var L = window.ClockStudioLang = {
       trouble_3_a: '字型是從網路載入的。沒有連網時，會用替代字型顯示。請在連網狀態下，按瀏覽器來源的「更新當前頁面快取」試試看。',
       trouble_4_q: '移動資料夾後就不顯示了',
       trouble_4_a: '網址裡包含檔案的位置。移動資料夾或改名後，請重新開啟這個設定畫面產生新網址，再重新貼到 OBS。',
+      trouble_4_q_web: '直播中時鐘消失了／沒有顯示',
+      trouble_4_a_web: '網頁版是透過網路讀取的，網路斷線時就不會顯示。如果想用電腦裡的檔案執行，請改用 {link}。',
+      trouble_4_link_web: 'BOOTH 的 ZIP 版 (免費)',
 
       import_title: '從貼在 OBS 的網址讀取設定',
       import_body: '貼上從 OBS 瀏覽器來源網址欄位複製的網址，就能讀取當時的設定並繼續修改。目前的設定會被取代 (讀取後可以按「復原」還原)。改好後，請重新複製網址並貼到 OBS。',

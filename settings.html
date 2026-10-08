@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>きせかえ時計 Clock Studio 設定</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23262626' stroke='%23b8b8b8' stroke-width='2.5'/%3E%3Cpath d='M16 8.5V16l5 3' fill='none' stroke='%23e6e6e6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>
 /* テーマはちらつかないよう、描画前に決める (既定はダーク) */
 try { document.documentElement.setAttribute('data-theme', localStorage.getItem('clockStudio.theme') === 'light' ? 'light' : 'dark'); } catch (e) {}
@@ -43,6 +44,10 @@ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('
   --ok-soft: #22301f;
   --ok-bg: #2e7a3e;       /* 「コピーしました」のボタンの塗り */
   --ng: #e06c6c;
+  --notice: #e8b339;      /* 無料版のクレジット案内 (琥珀色の左線・見出し) */
+  --notice-text: #f0c35a;
+  --notice-bg: #2f2a1d;
+  --notice-edge: #6e5822;
   --chk-a: #2c2c2c; --chk-b: #222222;   /* 透明の市松 (ステージと同じく、テーマに関係なく暗い) */
   --thumb-bg: #121212;    /* サムネイルの面はテーマに関係なく暗いまま (白文字のデザインが見えるように) */
   --backdrop: rgba(0,0,0,.6);
@@ -81,6 +86,10 @@ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('
   --ok-soft: #dcebdc;
   --ok-bg: #2e7a3e;
   --ng: #b42318;
+  --notice: #b97c00;
+  --notice-text: #6a4300;
+  --notice-bg: #fbf1d8;
+  --notice-edge: #d8b465;
   --thumb-bg: #161616;
   --backdrop: rgba(0,0,0,.42);
 }
@@ -340,15 +349,20 @@ iframe { color-scheme: light; }
 .obs-msg.ok { color: var(--ok); font-weight: 600; }
 .obs-msg.ng { color: var(--ng); }
 /* 無料版: コピー後のクレジット案内 (帯の中に静かに出す) */
-.credit { margin: 4px 8px 0 10px; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); font-size: 13px; line-height: 18px; color: var(--text-2); }
+.credit { margin: 6px 8px 0 10px; padding: 8px 10px 8px 10px; border: 1px solid var(--notice-edge); border-left: 3px solid var(--notice); border-radius: 2px; background: var(--notice-bg); font-size: 13px; line-height: 18px; color: var(--text); }
 .credit[hidden] { display: none; }
-.credit .cr-h { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-weight: 600; }
-.credit .cr-h span { flex: 1 1 auto; min-width: 0; }
-.credit .cr-body { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
-.credit .cr-text { flex: 1 1 auto; min-width: 0; margin: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); color: var(--text); font: 12px/17px Consolas, 'Courier New', monospace; white-space: pre-wrap; word-break: break-all; user-select: all; }
+.credit .cr-h { display: flex; align-items: flex-start; gap: 6px; color: var(--notice-text); font-size: 13.5px; font-weight: 700; line-height: 20px; }
+.credit .cr-h .ic { flex: none; display: inline-flex; margin-top: 2px; color: var(--notice); }
+.credit .cr-h .cr-t { flex: 1 1 auto; min-width: 0; }
+.credit .cr-x { flex: none; min-height: 20px; padding: 0 4px; color: var(--text-3); font-size: 12px; font-weight: 400; }
+.credit .cr-x:hover { color: var(--text); text-decoration: underline; }
+.credit .cr-body { display: flex; align-items: flex-start; gap: 8px; margin-top: 6px; }
+.credit .cr-text { flex: 1 1 auto; min-width: 0; margin: 0; padding: 4px 6px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); color: var(--text); font: 12px/17px Consolas, 'Courier New', monospace; white-space: pre-wrap; word-break: break-all; user-select: all; }
 .credit .cr-body .btn { flex: none; }
-.credit .cr-foot { margin-top: 4px; font-size: 12px; color: var(--text-3); }
+.credit .cr-foot { margin-top: 5px; font-size: 12px; color: var(--text-2); }
 .credit .cr-foot a { color: var(--accent-text); }
+.credit.in-dlg { margin: 12px 0 0; }
+.credit.in-dlg .cr-body { flex-direction: column; align-items: stretch; }
 @media (max-width: 999px) { .credit .cr-body { flex-wrap: wrap; } .credit .cr-body .btn { width: 100%; } }
 
 /* ================= ② 好みに調整 (右カラム) ================= */
@@ -514,6 +528,7 @@ dialog.howto .dlg-in { overflow-y: auto; padding: 14px 16px 14px; }
 dialog.howto .acts { position: sticky; bottom: -14px; }
 .howto h4 { margin: 14px 0 4px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--strip); font-size: 13.5px; font-weight: 600; }
 .howto .lead { margin: 0 0 12px; color: var(--text-2); }
+.howto .weburl { padding: 0 4px; border: 1px solid var(--line); border-radius: 2px; background: var(--field); color: var(--text); font: 12px/18px Consolas, 'Courier New', monospace; word-break: break-all; user-select: all; }
 .obswrap { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 24px; }
 /* OBS の画面を模した図 (テーマに関係なく OBS と同じ暗いグレー) */
 .mock { flex: 0 1 410px; min-width: 280px; color: #e6e6e6; font-size: 14px; }
@@ -561,6 +576,7 @@ dialog.howto .acts { position: sticky; bottom: -14px; }
 .trouble summary::before { content: ''; flex: none; width: 6px; height: 6px; margin-left: 4px; border-right: 1.5px solid var(--text-3); border-bottom: 1.5px solid var(--text-3); transform: rotate(-45deg); transition: transform .15s; }
 .trouble details[open] summary::before { transform: rotate(45deg); }
 .trouble details p { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); font-size: 13px; }
+.trouble details p a { color: var(--accent-text); }
 /* URL から読み込む */
 .import textarea { width: 100%; height: 80px; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); color: var(--text); font-family: Consolas, monospace; font-size: 13px; resize: vertical; }
 .import textarea:hover { border-color: var(--line-3); }
@@ -750,6 +766,9 @@ dialog.howto .acts { position: sticky; bottom: -14px; }
 'use strict';
 var CS = window.ClockStudio, D = CS.DEFAULTS;
 var FREE = CS.EDITION === 'free';
+/* Web 版 (GitHub Pages など http/https で開いたとき): ZIP 前提の文言を置き換える */
+var IS_WEB = /^https?:$/.test(location.protocol);
+var FREE_BOOTH_URL = 'https://amemineamane.booth.pm/items/8958309';   /* 無料版 (ZIP) の BOOTH ページ */
 
 /* ---------- 言語 ----------
  * 画面の言語 (uiLang): localStorage (LG.STORE_KEY) → 無ければ navigator.languages から detect。右上で切り替え (保存して reload)。
@@ -1059,7 +1078,8 @@ function fallbackLang() {
     "credit_copy": "クレジットをコピー",
     "credit_copied": "クレジットをコピーしました",
     "credit_box_aria": "コピー用のクレジット文",
-    "credit_rt": "告知ポストのリポスト (RT) でも OK です。",
+    "credit_rt": "{link}のリポスト (RT) でも OK です。",
+    "credit_rt_link": "告知ポスト",
     "credit_paid": "有料版はクレジット不要",
     "credit_close": "閉じる",
     "howto_lead": "OBS の「ブラウザ」ソースの画面は、こんな見た目です。番号の場所を、手順どおりに設定します。",
@@ -1085,6 +1105,7 @@ function fallbackLang() {
     "size_note_estimate": "おおよその目安です (プレビューの計測が終わると正確な値に変わります)。",
     "howto_h_noconfig": "設定を変えずに、そのまま使うなら",
     "howto_noconfig": "OBS のブラウザソースで「ローカルファイル」にチェックを入れ、このフォルダの clock.html を選ぶだけで、標準のデザイン (プレーン) の時計が出ます。(幅・高さの目安: 幅 350 × 高さ 130)",
+    "howto_noconfig_web": "OBS のブラウザソースの URL 欄に {url} を貼るだけで、標準のデザイン (プレーン) の時計が出ます。(幅・高さの目安: 幅 350 × 高さ 130)",
     "howto_h_later": "あとで設定を変えたいとき",
     "howto_later": "この画面の「{link}」に OBS に貼ってある URL を貼ると、そのときの設定から続きを直せます。直したら、URL をコピーし直して OBS に貼り直します。",
     "howto_h_trouble": "うまくいかないとき",
@@ -1096,6 +1117,9 @@ function fallbackLang() {
     "trouble_3_a": "フォントはインターネットから読み込みます。ネットにつながっていないと、代わりのフォントで表示されます。つながっている状態で、ブラウザソースの「現在のページのキャッシュを更新」を押してみてください。",
     "trouble_4_q": "フォルダを動かしたら表示されなくなった",
     "trouble_4_a": "URL にはファイルの置き場所が入っています。フォルダを動かしたり名前を変えたりしたときは、この設定画面を開き直して URL を作り直し、OBS に貼り直してください。",
+    "trouble_4_q_web": "配信中に時計が消えた / 表示されない",
+    "trouble_4_a_web": "Web 版はインターネット経由で読み込みます。回線が切れていると表示されません。手元のファイルで動かしたい場合は {link} をどうぞ。",
+    "trouble_4_link_web": "BOOTH の ZIP 版 (無料)",
     "import_title": "OBS に貼ってある URL から設定を読み込む",
     "import_body": "OBS のブラウザソースの URL 欄からコピーした URL を貼ると、そのときの設定を読み込んで続きから直せます。いまの設定は置き換わります (読み込んだあとに「元に戻す」で戻せます)。直したら、URL をコピーし直して OBS に貼り直します。",
     "import_placeholder": "OBS に貼ってある URL をここに貼り付け (…/clock.html?… の形)",
@@ -1174,6 +1198,7 @@ var ICONS = {
   x: '<svg width="16" height="16" ' + SV + ' stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   book: '<svg width="15" height="15" ' + SV + '><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7"/></svg>',
   load: '<svg width="15" height="15" ' + SV + '><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>',
+  alert: '<svg width="16" height="16" ' + SV + ' stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><circle cx="12" cy="16.5" r=".9" fill="currentColor"/></svg>',
   globe: '<svg width="15" height="15" ' + SV + '><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>'
 };
 function icon(name) { var s = document.createElement('span'); s.className = 'ic'; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name]; return s; }
@@ -2242,35 +2267,42 @@ function copyLabel(done) {
   copyBtn.classList.toggle('done', !!done);
 }
 /* 無料版: URL をコピーするたびに出す、クレジット表記のお願い */
-var creditBox, creditBtn, creditTxt, creditTimer = 0;
+var creditBox, creditBtn;
+var CREDIT_POST_URL = 'https://x.com/AmemineAmane/status/2108210713454112840';   /* 告知ポスト (RT でもクレジットの代わりになる) */
 var CREDIT_URLS = '\nBOOTH: https://amemineamane.booth.pm/\nX: https://x.com/AmemineAmane';
-function creditLabel(done) {
-  creditBtn.textContent = '';
-  creditBtn.appendChild(icon(done ? 'check' : 'copy'));
-  creditBtn.appendChild(document.createTextNode(T(done ? 'credit_copied' : 'credit_copy')));
-  creditBtn.classList.toggle('done', !!done);
+function creditLabel(btn, done) {
+  btn.textContent = '';
+  btn.appendChild(icon(done ? 'check' : 'copy'));
+  btn.appendChild(document.createTextNode(T(done ? 'credit_copied' : 'credit_copy')));
+  btn.classList.toggle('done', !!done);
 }
-function buildCredit(bar) {
-  var x = h('button', { type: 'button', class: 'link', text: T('credit_close') });
-  creditTxt = h('pre', { class: 'cr-text', tabindex: '0', 'aria-label': T('credit_box_aria'), text: T('credit_line1') + CREDIT_URLS });
-  creditBtn = h('button', { type: 'button', class: 'btn' });
-  creditLabel(false);
-  creditBtn.addEventListener('click', function () {
-    copyText(creditTxt.textContent, function (ok) {
-      if (!ok) { try { var r = document.createRange(); r.selectNodeContents(creditTxt); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); creditTxt.focus(); } catch (e) {} return; }
-      creditLabel(true);
-      clearTimeout(creditTimer); creditTimer = setTimeout(function () { creditLabel(false); }, 2000);
+/* 琥珀色のクレジット案内 (見出し + コピー用の文 + コピーボタン)。onClose があれば「閉じる」をつける */
+function creditPanel(id, onClose, foot) {
+  var head = h('div', { class: 'cr-h' }, [icon('alert'), h('span', { class: 'cr-t', text: T('credit_head') })]);
+  if (onClose) { var x = h('button', { type: 'button', class: 'link cr-x', text: T('credit_close') }); x.addEventListener('click', onClose); head.appendChild(x); }
+  var txt = h('pre', { class: 'cr-text', tabindex: '0', 'aria-label': T('credit_box_aria'), text: T('credit_line1') + CREDIT_URLS });
+  var btn = h('button', { type: 'button', class: 'btn primary' }), timer = 0;
+  creditLabel(btn, false);
+  btn.addEventListener('click', function () {
+    copyText(txt.textContent, function (ok) {
+      if (!ok) { try { var r = document.createRange(); r.selectNodeContents(txt); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); txt.focus(); } catch (e) {} return; }
+      creditLabel(btn, true);
+      clearTimeout(timer); timer = setTimeout(function () { creditLabel(btn, false); }, 2000);
     });
   });
-  x.addEventListener('click', function () { creditBox.hidden = true; });
-  creditBox = h('div', { class: 'credit', id: 'creditBox', role: 'status', hidden: '' }, [
-    h('div', { class: 'cr-h' }, [h('span', { text: T('credit_head') }), x]),
-    h('div', { class: 'cr-body' }, [creditTxt, creditBtn]),
-    h('div', { class: 'cr-foot' }, [T('credit_rt') + ' ', h('a', { href: CS.PAID_URL, target: '_blank', rel: 'noopener', text: T('credit_paid') })])
-  ]);
+  var box = h('div', { class: 'credit' + (onClose ? '' : ' in-dlg'), id: id }, [head, h('div', { class: 'cr-body' }, [txt, btn])]);
+  if (foot) { var ft = appendParts(h('div', { class: 'cr-foot' }), 'credit_rt', null, { link: h('a', { href: CREDIT_POST_URL, target: '_blank', rel: 'noopener', class: 'cr-post', text: T('credit_rt_link') }) }); ft.appendChild(document.createTextNode(' ')); ft.appendChild(h('a', { href: CS.PAID_URL, target: '_blank', rel: 'noopener', class: 'cr-paid', text: T('credit_paid') })); box.appendChild(ft); }
+  box._btn = btn;
+  return box;
+}
+function buildCredit(bar) {
+  creditBox = creditPanel('creditBox', function () { creditBox.hidden = true; }, true);
+  creditBox.setAttribute('role', 'status');
+  creditBox.hidden = true;
+  creditBtn = creditBox._btn;
   bar.appendChild(creditBox);
 }
-function showCredit() { if (FREE && creditBox) { creditBox.hidden = false; creditLabel(false); } }
+function showCredit() { if (FREE && creditBox) { creditBox.hidden = false; creditLabel(creditBtn, false); } }
 var ctimer = 0;
 function doCopy() {
   copyText(urlNow(), function (ok) {
@@ -2359,6 +2391,7 @@ function buildHowto() {
     });
   });
   proc.appendChild(copy2);
+  if (FREE) proc.appendChild(creditPanel('creditDlg', null, true));   /* 無料版: 初回に自動で開くこのダイアログの中にもクレジットのお願いを出す */
   wrap.appendChild(proc);
   host.appendChild(wrap);
   mW.addEventListener('click', function () { flashCopy(mW, recSize()[0]); });
@@ -2375,14 +2408,18 @@ function buildHowto() {
   syncers.push(function () { mUrl.textContent = urlNow(); });
 
   host.appendChild(h('h4', { text: T('howto_h_noconfig') }));
-  host.appendChild(h('p', { class: 'lead', text: T('howto_noconfig') }));
+  if (IS_WEB) host.appendChild(appendParts(h('p', { class: 'lead', id: 'howNoconfig' }), 'howto_noconfig_web', null, { url: h('span', { class: 'weburl', text: new URL('clock.html', location.href).href }) }));
+  else host.appendChild(h('p', { class: 'lead', id: 'howNoconfig', text: T('howto_noconfig') }));
   host.appendChild(h('h4', { text: T('howto_h_later') }));
   var impLink = h('button', { type: 'button', class: 'link', style: 'padding:0;font-size:inherit' }, [T('import_link')]);
   impLink.addEventListener('click', function () { closeDlg($('dlgHowto')); openImport(); });
   host.appendChild(appendParts(h('p', { class: 'lead' }), 'howto_later', null, { link: impLink }));
   host.appendChild(h('h4', { text: T('howto_h_trouble') }));
   var tr = h('div', { class: 'trouble' });
-  [1, 2, 3, 4].forEach(function (i) { tr.appendChild(h('details', null, [h('summary', { text: T('trouble_' + i + '_q') }), h('p', { text: T('trouble_' + i + '_a') })])); });
+  [1, 2, 3].forEach(function (i) { tr.appendChild(h('details', null, [h('summary', { text: T('trouble_' + i + '_q') }), h('p', { text: T('trouble_' + i + '_a') })])); });
+  /* 4: ZIP 版は「フォルダを動かしたら」、Web 版は「回線が切れたら」 (ZIP 版への案内つき) */
+  var a4 = IS_WEB ? appendParts(h('p'), 'trouble_4_a_web', null, { link: h('a', { href: FREE_BOOTH_URL, target: '_blank', rel: 'noopener', text: T('trouble_4_link_web') }) }) : h('p', { text: T('trouble_4_a') });
+  tr.appendChild(h('details', { id: 'trouble4' }, [h('summary', { text: T(IS_WEB ? 'trouble_4_q_web' : 'trouble_4_q') }), a4]));
   host.appendChild(tr);
   host.appendChild(h('div', { class: 'acts' }, [h('button', { class: 'btn', type: 'button', text: T('close'), onclick: function () { closeDlg($('dlgHowto')); } })]));
 }
