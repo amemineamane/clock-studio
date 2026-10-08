@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>きせかえ時計 Clock Studio 設定</title>
+<script>
+/* テーマはちらつかないよう、描画前に決める (既定はダーク) */
+try { document.documentElement.setAttribute('data-theme', localStorage.getItem('clockStudio.theme') === 'light' ? 'light' : 'dark'); } catch (e) {}
+</script>
+<style>
+/* 見た目の方針 (案 B「機材・ツール」): OBS や映像編集ソフトのような無彩色のグレー。
+ * 差し色は青 1 色で、選択中と主ボタンにだけ使う。影・グラデーション・丸いバッジは使わない。角は 2〜3px。
+ * 文字は 13px 以上。主要な操作の高さは 28px 以上。 */
+
+/* ================= 色 (CSS 変数) ================= */
+:root {
+  color-scheme: dark;
+  --bg: #1e1e1e;          /* 画面の地 */
+  --panel: #262626;       /* パネル */
+  --strip: #2f2f2f;       /* 見出しの帯 */
+  --strip-hover: #363636;
+  --raised: #303030;      /* ボタンの面・セルのホバー */
+  --raised-2: #3a3a3a;    /* ボタンのホバー */
+  --press: #282828;       /* ボタンを押している間 */
+  --field: #1b1b1b;       /* 入力欄・セルの地 */
+  --line: #3a3a3a;        /* パネルの枠・区切り */
+  --line-2: #4a4a4a;      /* 部品の枠 */
+  --line-3: #5e5e5e;      /* 部品の枠 (ホバー) */
+  --box: #7a7a7a;         /* チェックボックスの枠 */
+  --text: #dcdcdc;
+  --text-2: #b8b8b8;
+  --text-3: #9a9a9a;
+  --accent: #3574c4;      /* 主ボタン・選択の塗り (白文字で 4.5:1 以上) */
+  --accent-hover: #3877c8;
+  --accent-mark: #4a8fd8; /* 選択の枠線 */
+  --accent-text: #6aa6e6; /* リンク */
+  --on-accent: #ffffff;
+  --focus: #9cc6f5;       /* キーボードフォーカスの線 (選択の枠より明るい。外側に離して描く) */
+  --sel-bg: #263a54;      /* 選択中・オンの塗り (内側の塗り。フォーカスの輪郭とは形で区別する) */
+  --warn: #e3b55a;        /* 注意 (おすすめサイズが大きすぎる など) */
+  --ok: #6cbf7c;          /* 「コピーしました」などの文字 */
+  --ok-soft: #22301f;
+  --ok-bg: #2e7a3e;       /* 「コピーしました」のボタンの塗り */
+  --ng: #e06c6c;
+  --chk-a: #2c2c2c; --chk-b: #222222;   /* 透明の市松 (ステージと同じく、テーマに関係なく暗い) */
+  --thumb-bg: #121212;    /* サムネイルの面はテーマに関係なく暗いまま (白文字のデザインが見えるように) */
+  --backdrop: rgba(0,0,0,.6);
+  /* カラム幅 */
+  --lw: 312px;
+  --rw: 368px;
+  --dcols: 2;
+  --th: 62px;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #d6d6d6;
+  --panel: #ececec;
+  --strip: #dcdcdc;
+  --strip-hover: #d0d0d0;
+  --raised: #e2e2e2;
+  --raised-2: #d6d6d6;
+  --press: #cbcbcb;
+  --field: #ffffff;
+  --line: #c2c2c2;
+  --line-2: #a8a8a8;
+  --line-3: #868686;
+  --box: #6e6e6e;
+  --text: #1e1e1e;
+  --text-2: #3c3c3c;
+  --text-3: #5a5a5a;
+  --accent: #2f69b3;
+  --accent-hover: #2a5fa3;
+  --accent-mark: #2f69b3;
+  --accent-text: #24569a;
+  --on-accent: #ffffff;
+  --focus: #0a66e0;
+  --sel-bg: #cfdff4;
+  --warn: #8a5300;
+  --ok: #2b7139;
+  --ok-soft: #dcebdc;
+  --ok-bg: #2e7a3e;
+  --ng: #b42318;
+  --thumb-bg: #161616;
+  --backdrop: rgba(0,0,0,.42);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: 'Segoe UI', 'Yu Gothic UI', 'Meiryo UI', 'Meiryo', sans-serif; font-size: 13px; line-height: 1.5;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+::selection { background: #3574c4; color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: var(--line-3) transparent; }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ic { display: inline-flex; line-height: 0; flex: none; }
+.ic svg { display: block; }
+/* 小さな線画アイコンはツールバー的なボタン (見出しの帯・コピー・検索) にだけ出す */
+.link .ic, .rs .ic, .chip .ic, .pillbtn .ic, .btn.small .ic, .btn.primary .ic { display: none; }
+.col-head .btn.small .ic { display: inline-flex; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ================= 1 画面のアプリ構成 (幅 1000px 以上) ================= */
+@media (min-width: 1000px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  .app { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+}
+
+/* ================= ヘッダー: メニューバー風の細い帯 ================= */
+.top { flex: none; display: flex; align-items: center; gap: 6px 12px; padding: 3px 8px; min-height: 36px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; flex: none; }
+.logo { width: 22px; height: 22px; border-radius: 2px; background: var(--raised-2); color: var(--text); display: flex; align-items: center; justify-content: center; flex: none; }
+.logo svg { width: 15px; height: 15px; }
+.brand h1 { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; line-height: 1.25; font-weight: 600; white-space: nowrap; }
+.brand h1 small { font-size: 13px; font-weight: 400; color: var(--text-3); }
+.badge { flex: none; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--raised); color: var(--text-2); font-size: 13px; line-height: 20px; white-space: nowrap; }
+.hint { flex: 0 1 auto; min-width: 0; margin: 0 auto 0 4px; display: flex; align-items: center; gap: 8px; padding: 0 0 0 12px; border-left: 1px solid var(--line); font-size: 13px; color: var(--text-3); }
+.hint[hidden] { display: none; }
+.hint .ht, .hint .ht-s, .hint .ht-n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hint .ht-s, .hint .ht-n { display: none; }   /* 狭い幅用の短いヒント */
+.hint b { color: var(--text); font-weight: 600; }
+.hint .x { flex: none; width: 28px; height: 28px; border: 0; border-radius: 2px; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+.hint .x svg { width: 13px; height: 13px; }
+.hint .x:hover { background: var(--raised-2); color: var(--text); }
+.top .tbtns { margin-left: auto; display: flex; gap: 2px; flex: none; }
+.hint:not([hidden]) + .tbtns { margin-left: 0; }
+.pillbtn { display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border: 1px solid transparent; border-radius: 2px; background: transparent; color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.pillbtn:hover { background: var(--raised); border-color: var(--line-2); color: var(--text); }
+/* 画面の言語 (右上) */
+.langbox { position: relative; display: inline-flex; align-items: center; color: var(--text-2); }
+.langbox .ic { position: absolute; left: 8px; pointer-events: none; display: inline-flex; }
+.langbox select { min-height: 28px; padding: 2px 6px 2px 28px; border-color: transparent; background: transparent; color: var(--text-2); font-size: 13px; cursor: pointer; }
+.langbox select:hover { background: var(--raised); border-color: var(--line-2); color: var(--text); }
+.langbox select option { background: var(--panel); color: var(--text); }
+
+/* ================= 3 カラム: ドッキングしたパネル ================= */
+.app { display: grid; grid-template-columns: var(--lw) minmax(0, 1fr) var(--rw); gap: 4px; padding: 4px; }
+.col { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; }
+.col-design, .col-adjust { overflow: hidden; }
+/* カラムの見出し: 濃いグレーの細い帯 */
+.col-head { flex: none; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 4px 0 10px; background: var(--strip); border-bottom: 1px solid var(--line); }
+.col-head h2 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.3; font-weight: 600; white-space: nowrap; }
+.col-head .sub { font-size: 13px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.col-head .end { margin-left: auto; }
+/* ①②③ は数字 + 区切り線 (バッジにしない) */
+.num { flex: none; display: inline-flex; align-items: center; padding-right: 8px; border-right: 1px solid var(--line-2); color: var(--text-3); font-size: 13px; font-weight: 600; line-height: 14px; }
+
+/* ================= ボタン・入力 ================= */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 3px 12px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--raised); color: var(--text); line-height: 1.4; text-decoration: none; white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--raised-2); border-color: var(--line-3); }
+.btn:active:not(:disabled) { background: var(--press); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--focus); }
+.btn.primary.done, .btn.primary.done:hover:not(:disabled) { background: var(--ok-bg); border-color: var(--ok-bg); color: #fff; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn.ghost:hover:not(:disabled) { background: var(--raised); border-color: var(--line-2); color: var(--text); }
+.btn.small { min-height: 28px; padding: 1px 9px; font-size: 13px; }
+.btn.icon { padding: 3px 6px; }
+.btn:disabled { opacity: .4; }
+.link { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 1px 4px; border: 0; border-radius: 2px; background: transparent; color: var(--accent-text); font-size: 13px; text-decoration: none; white-space: nowrap; }
+.link:hover { text-decoration: underline; }
+select, input[type=text], input[type=number], input[type=search] { max-width: 100%; min-height: 28px; padding: 2px 7px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); font-size: 13px; }
+select:hover, input[type=text]:hover, input[type=number]:hover, input[type=search]:hover { border-color: var(--line-3); }
+select:focus, input[type=text]:focus, input[type=number]:focus, input[type=search]:focus { border-color: var(--accent-mark); outline: none; }
+select:focus-visible, input[type=text]:focus-visible, input[type=number]:focus-visible, input[type=search]:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-mark); }
+input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
+input[type=number] { width: 64px; font-variant-numeric: tabular-nums; }
+input[type=range] { min-width: 0; accent-color: var(--accent-mark); }
+input[type=color] { -webkit-appearance: none; appearance: none; flex: none; width: 34px; height: 28px; padding: 2px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); cursor: pointer; }
+input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color]::-webkit-color-swatch { border: 1px solid rgba(128,128,128,.35); border-radius: 1px; }
+/* オン / オフ: 四角いチェックボックス */
+.sw-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; cursor: pointer; user-select: none; }
+.sw-toggle input { -webkit-appearance: none; appearance: none; position: relative; flex: none; width: 15px; height: 15px; margin: 0; border: 1px solid var(--box); border-radius: 2px; background: var(--field); cursor: pointer; }
+.sw-toggle input:checked { background: var(--accent); border-color: var(--accent); }
+.sw-toggle input:checked::after, .tg[aria-pressed="true"] .tsw::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.sw-toggle:hover input:not(:disabled):not(:checked) { border-color: var(--text-2); }
+.sw-toggle input:disabled { opacity: .4; }
+/* セグメント: つながった四角いボタン列。選択は青ベタ */
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); }
+.seg button { min-height: 28px; padding: 2px 11px; border: 0; border-left: 1px solid var(--line-2); background: transparent; color: var(--text-2); }
+.seg button:first-child { border-left: 0; }
+.seg button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+/* 折り返す選択肢 (日付の書き方・系統・配色・フォントなど): セルを 1px ずつ重ねたグリッド */
+.opts, .chips, .pals, .fonts { padding: 1px 0 0 1px; }
+.opts { display: flex; flex-wrap: wrap; }
+.opts button { min-height: 28px; margin: -1px 0 0 -1px; padding: 2px 9px; border: 1px solid var(--line-2); border-radius: 0; background: var(--field); color: var(--text-2); font-size: 13px; }
+.opts button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.opts button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.quick { display: flex; flex-wrap: wrap; align-items: center; width: 100%; margin-top: 6px; padding-left: 1px; }
+.pbtn { min-height: 28px; margin-left: -1px; padding: 1px 10px; border: 1px solid var(--line-2); border-radius: 0; background: var(--field); color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pbtn:first-child { border-radius: 2px 0 0 2px; }
+.pbtn:last-child { border-radius: 0 2px 2px 0; }
+.pbtn:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.pbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+/* 重ねたセルは、選択中・フォーカス中のものを前に出して枠が隣に隠れないようにする */
+.opts button[aria-pressed="true"], .pbtn[aria-pressed="true"], .chip[aria-pressed="true"], .pal[aria-pressed="true"], .fbtn[aria-pressed="true"] { position: relative; z-index: 1; }
+.opts button:focus-visible, .pbtn:focus-visible, .chip:focus-visible, .pal:focus-visible, .fbtn:focus-visible, .seg button:focus-visible { position: relative; z-index: 2; }
+
+/* ================= ① デザイン (左カラム) ================= */
+.dtools { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 6px; border-bottom: 1px solid var(--line); }
+.srow { display: flex; gap: 4px; }
+.rndbtn { flex: none; padding: 1px 8px; }
+.rndbtn .ic svg, .col-head .btn .ic svg { width: 13px; height: 13px; }
+.col-head .btn.small { padding: 0 7px; background: transparent; border-color: transparent; }
+.col-head .btn.small:hover:not(:disabled) { background: var(--raised); border-color: var(--line-2); }
+.search { position: relative; flex: 1 1 auto; min-width: 0; }
+.search .ic { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+.search .ic svg { width: 13px; height: 13px; }
+.search input { width: 100%; padding-left: 26px; }
+/* 系統のしぼり込み: 角ばったタブのグリッド */
+.chips { display: flex; flex-wrap: wrap; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; margin: -1px 0 0 -1px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 0; background: var(--field); color: var(--text-2); font-size: 13px; line-height: 1; }
+.chip:hover { background: var(--raised); color: var(--text); }
+.chip small { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.chip[aria-pressed="true"] small { color: var(--on-accent); }
+.dmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; min-height: 18px; font-size: 13px; color: var(--text-3); }
+.dmeta > * { white-space: nowrap; }
+.dmeta .onlyfree { margin-left: auto; min-height: 28px; color: var(--text-2); }
+.dlist { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+.dgroup + .dgroup { margin-top: 6px; }
+.ghead { position: sticky; top: 0; z-index: 3; display: flex; align-items: baseline; gap: 8px; margin: 0 -6px 4px; padding: 3px 8px; background: var(--strip); border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--text); }
+.ghead small { font-size: 13px; font-weight: 400; color: var(--text-3); }
+.dgrid { display: grid; grid-template-columns: repeat(var(--dcols), minmax(0, 1fr)); gap: 4px; }
+/* デザインのカード: 枠なしのタイル。選択は青の枠 2px + 左上のチェック */
+.card { position: relative; min-width: 0; }
+.card .pick { display: block; width: 100%; padding: 2px; border: 0; border-radius: 2px; background: transparent; color: var(--text); text-align: left; }
+.card .pick:hover { background: var(--raised); }
+.card .thumb { position: relative; display: flex; align-items: center; justify-content: center; height: var(--th); border-radius: 1px; overflow: hidden; background: var(--thumb-bg); }
+.card .thumb img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 6px 8px; }
+.card .thumb .alt { display: none; padding: 0 6px; color: #cfcfcf; font-size: 13px; font-weight: 600; text-align: center; }
+.card.nothumb .thumb img { display: none; }
+.card.nothumb .thumb .alt { display: block; }
+.card .nm { display: block; padding: 2px 2px 1px; font-size: 13px; line-height: 1.35; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.on .pick, .card.on .pick:hover { background: var(--sel-bg); box-shadow: inset 0 0 0 1px var(--accent-mark); }
+.card .pick:focus-visible { position: relative; z-index: 2; outline: 2px solid var(--focus); outline-offset: 2px; }
+.card.on .nm { color: var(--text); font-weight: 600; }
+/* 試し表示中 (マウスを乗せている): 灰色の枠 */
+.card.trial .pick { background: var(--raised); box-shadow: inset 0 0 0 1px var(--box); }
+.card.on.trial .pick { box-shadow: inset 0 0 0 1px var(--accent-mark); }
+.card .sel { position: absolute; left: 4px; top: 4px; display: none; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 1px; background: var(--accent); color: var(--on-accent); pointer-events: none; }
+.card .sel svg { width: 11px; height: 11px; }
+.card.on .sel { display: flex; }
+.card .fav { position: absolute; right: 4px; top: 4px; z-index: 3; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #555; border-radius: 2px; background: rgba(20,20,20,.85); color: #dcdcdc; opacity: 0; }
+.card .fav svg { width: 13px; height: 13px; }
+.card .fav:hover { background: #3a3a3a; }
+.card:hover .fav, .card:focus-within .fav, .card .fav[aria-pressed="true"] { opacity: 1; }
+.card .fav[aria-pressed="true"] { color: #ffffff; }
+.card .fav[aria-pressed="true"] svg { fill: currentColor; }
+@media (hover: none) { .card .fav { opacity: 1; } }
+/* 無料版で使えないデザイン: 鍵の札 + サムネイルを暗く */
+.card .lockmark, .paid-img .lockmark { position: absolute; display: none; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid #555; border-radius: 2px; background: rgba(20,20,20,.88); color: #dcdcdc; font-size: 13px; white-space: nowrap; }
+.card .lockmark { right: 3px; top: 3px; padding: 3px; }
+.card .lockmark .lt { display: none; }   /* カードでは鍵だけ (文字つきの札は時計の数字を隠すため)。名前の横に出す */
+.card.locked .nm::after { content: var(--locked-sfx, ' ・有料版'); }
+.card .lockmark svg, .paid-img .lockmark svg { width: 12px; height: 12px; }
+.card.locked .lockmark { display: inline-flex; }
+.card.locked .thumb img { opacity: .75; }
+.card.locked .nm { color: var(--text-3); }
+.card.locked .pick:hover .thumb img { opacity: .8; }
+.card.flash .pick { animation: flash .7s ease-out; }
+@keyframes flash { 0% { box-shadow: inset 0 0 0 4px var(--accent-mark); } 100% { box-shadow: inset 0 0 0 1px var(--accent-mark); } }
+.empty { padding: 24px 6px; color: var(--text-2); font-size: 13px; text-align: center; }
+.empty .btn { margin-top: 10px; }
+
+/* ================= 中央: プレビュー ================= */
+.col-center { display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.pvpanel { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "stage"; overflow: hidden; }
+.pvtop { grid-area: top; display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 8px 0 10px; background: var(--strip); border-bottom: 1px solid var(--line); }
+.pvtop .lbl { font-size: 13px; color: var(--text-3); white-space: nowrap; }
+.pvtop .dn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.pvtop .pos { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.frametgl { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; font-size: 13px; color: var(--text-2); cursor: pointer; user-select: none; white-space: nowrap; }
+.frametgl:hover { color: var(--text); }
+.frametgl .ft-s { display: none; }
+.frametgl input { margin: 0; width: 14px; height: 14px; accent-color: var(--accent-mark); cursor: pointer; }
+/* ステージ (プレビューの面) はテーマに関係なく暗い */
+.stage { grid-area: stage; position: relative; min-height: 0; overflow: hidden; background-color: #111; background-size: cover; background-position: center; }
+.stage .frame { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; }
+.stage.showframe .frame { outline: 1.5px dashed rgba(110,165,230,.95); }
+/* 親の color-scheme (dark) と時計側 (light) が違うと iframe が不透明 (白) になるので、iframe 要素は時計側に合わせる */
+iframe { color-scheme: light; }
+.stage iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
+.stage .nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 4; display: flex; align-items: center; justify-content: center; width: 28px; height: 44px; border: 1px solid #4a4a4a; border-radius: 2px; background: rgba(38,38,38,.85); color: #e6e6e6; }
+.stage .nav svg { width: 16px; height: 16px; }
+.stage .nav:hover:not(:disabled) { background: #3a3a3a; border-color: #7a7a7a; }
+.stage .nav:disabled { opacity: .3; }
+.stage .nav.prev { left: 6px; }
+.stage .nav.next { right: 6px; }
+.stage .scale { position: absolute; right: 6px; bottom: 6px; z-index: 3; display: none; padding: 1px 8px; border-radius: 2px; background: rgba(30,30,30,.85); color: #dcdcdc; font-size: 13px; }
+.stage .scale.on { display: block; }
+.stage .trialtag { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 4; display: none; align-items: center; gap: 8px; padding: 2px 10px; border: 1px solid #555; border-radius: 2px; background: rgba(30,30,30,.92); color: #dcdcdc; font-size: 13px; white-space: nowrap; }
+.stage .trialtag b { color: #ffffff; font-weight: 600; }
+.stage .trialtag small { color: #a8a8a8; font-size: 13px; }
+.stage.trial .trialtag { display: inline-flex; }
+/* 通知 (トースト): ステージの下に出る暗い札 */
+.stage .toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 4px 12px; width: max-content; max-width: calc(100% - 24px); padding: 4px 6px 4px 12px; border: 1px solid #6a6a6a; border-radius: 2px; background: rgba(30,30,30,.96); color: #e6e6e6; font-size: 13px; line-height: 1.4; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s, visibility .2s; }
+.stage .toast .tm { min-width: 0; padding: 3px 0; }
+.stage .toast:not(.act) { padding-right: 12px; }
+.stage .toast.on { visibility: visible; opacity: 1; pointer-events: auto; }
+.stage .toast .tact { flex: none; min-height: 28px; padding: 2px 10px; border: 1px solid #7a7a7a; border-radius: 2px; background: #3a3a3a; color: #ffffff; font-weight: 600; white-space: nowrap; }
+.stage .toast .tact:hover { background: #4a4a4a; border-color: #9a9a9a; }
+
+/* プレビューの背景 (暗い無彩色で固定) */
+.bg-dark { background: #161616; }
+
+/* ================= 中央下: ③ OBS に入れる ================= */
+.obsbar { min-width: 0; padding: 0 0 6px; }
+.obs-h { display: flex; align-items: center; gap: 6px 10px; min-height: 30px; padding: 0 8px 0 10px; background: var(--strip); border-bottom: 1px solid var(--line); }
+.obs-h h2 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.obs-h .links { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 10px; }
+.obs-h .link { min-height: 28px; }
+.obs-h .link .lt-s { display: none; }   /* 狭い幅用の短い文言 */
+.obs-row { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 6px 8px 0 10px; }
+.copybtn { flex: none; min-width: 150px; min-height: 32px; padding: 5px 18px; font-size: 14px; }
+.copybtn .ic svg { width: 15px; height: 15px; }
+.sizebox { flex: none; display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.sizebox button { min-height: 28px; padding: 1px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); color: var(--text); font-family: Consolas, 'Segoe UI', monospace; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sizebox button:hover { border-color: var(--accent-mark); }
+.sizebox .x { color: var(--text-3); }
+/* 数字をクリックでコピーしたとき */
+.sizebox button.copied-now, .copied-now { background: var(--ok-soft) !important; border-color: var(--ok) !important; color: var(--ok) !important; }
+.urltext { flex: 1 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Consolas, 'Courier New', monospace; color: var(--text-2); }
+.urltext:focus { color: var(--text); }
+.openbtn { min-height: 28px; }
+/* メッセージは 2 行ぶんの高さを最初から取っておく (コピー後に行が増えても周りが動かない) */
+.obs-msg { height: 36px; margin: 4px 8px 0 10px; overflow: hidden; font-size: 13px; line-height: 18px; color: var(--text-3); }
+.obs-msg .nw { white-space: nowrap; }
+.obs-msg.warn { color: var(--warn); font-weight: 600; }
+.sizebox.over button { border-color: var(--warn); color: var(--warn); }
+.obs-msg.ok { color: var(--ok); font-weight: 600; }
+.obs-msg.ng { color: var(--ng); }
+/* 無料版: コピー後のクレジット案内 (帯の中に静かに出す) */
+.credit { margin: 4px 8px 0 10px; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); font-size: 13px; line-height: 18px; color: var(--text-2); }
+.credit[hidden] { display: none; }
+.credit .cr-h { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-weight: 600; }
+.credit .cr-h span { flex: 1 1 auto; min-width: 0; }
+.credit .cr-body { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
+.credit .cr-text { flex: 1 1 auto; min-width: 0; margin: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); color: var(--text); font: 12px/17px Consolas, 'Courier New', monospace; white-space: pre-wrap; word-break: break-all; user-select: all; }
+.credit .cr-body .btn { flex: none; }
+.credit .cr-foot { margin-top: 4px; font-size: 12px; color: var(--text-3); }
+.credit .cr-foot a { color: var(--accent-text); }
+@media (max-width: 999px) { .credit .cr-body { flex-wrap: wrap; } .credit .cr-body .btn { width: 100%; } }
+
+/* ================= ② 好みに調整 (右カラム) ================= */
+.adj { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.sec { padding: 0 10px 10px; }
+/* 区切りの見出し: 細い帯 */
+.sec-h { display: flex; align-items: center; gap: 8px; min-height: 26px; margin: 0 -10px 8px; padding: 3px 10px; background: var(--strip); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.sec:first-child .sec-h { border-top: 0; }
+.sec-h .sub { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--text-3); white-space: nowrap; }
+/* 無料版で固定の区切りの注記 */
+.locknote { display: flex; align-items: center; gap: 6px; margin: -2px 0 8px; padding: 3px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--raised); color: var(--text-2); font-size: 13px; }
+.locknote svg { width: 13px; height: 13px; }
+.locknote a { margin-left: auto; color: var(--accent-text); font-weight: 600; white-space: nowrap; }
+/* 秒・日付・12 時間表示: つながったトグルボタン (チェックボックス付き) */
+.tgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); }
+.tg { position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 30px; padding: 2px 6px; border: 0; border-left: 1px solid var(--line-2); border-radius: 0; background: transparent; color: var(--text-2); font-size: 13px; line-height: 1.2; white-space: nowrap; }
+.tg:first-child { border-left: 0; }
+.tg:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.tg:focus-visible { z-index: 2; }
+.tg .tsw { position: relative; flex: none; order: -1; width: 15px; height: 15px; border: 1px solid var(--box); border-radius: 2px; background: var(--field); }
+.tg[aria-pressed="true"] { background: var(--sel-bg); color: var(--text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-mark); }
+.tg[aria-pressed="true"] .tsw { background: var(--accent); border-color: var(--accent); }
+.tg:disabled { opacity: .4; }
+.tg .cdot { position: absolute; right: 3px; top: 3px; }
+.tnote { margin-top: 5px; font-size: 13px; color: var(--text-3); }
+.tnote:empty { display: none; }
+/* 変えた項目の印: 小さな青い四角 */
+.cdot { flex: none; display: none; width: 6px; height: 6px; background: var(--accent-mark); }
+.changed > .it-h .cdot, .tg.changed .cdot, .more.changed > summary .cdot { display: inline-block; }
+.it { margin-top: 8px; }
+.it:first-child { margin-top: 0; }
+.it[hidden] { display: none; }
+.it-h { display: flex; align-items: center; gap: 6px; min-height: 20px; margin-bottom: 3px; font-size: 13px; font-weight: 600; }
+.it-h .hint2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 400; color: var(--text-3); }
+.it-h .rs { flex: none; display: none; align-items: center; gap: 4px; min-height: 28px; margin: -4px 0 -4px auto; padding: 1px 6px; border: 0; border-radius: 2px; background: transparent; color: var(--accent-text); font-size: 13px; font-weight: 400; }
+.it-h .rs:hover { background: var(--raised); }
+.changed > .it-h .rs { display: inline-flex; }
+.it.nolabel:not(.changed) > .it-h { display: none; }   /* 見出しなしの項目: 変えたときだけ「元に戻す」の行を出す */
+.it.nolabel > .it-h { justify-content: flex-end; }
+.it-c { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.it-c > div[style], .it-c > p { font-size: 13px; }
+/* 使えない項目 (無料版で固定・このデザインでは使えない): 部品を薄く + 理由の 1 行 */
+.it-off { display: none; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--text-3); }
+.it-off svg { width: 13px; height: 13px; }
+.it.off > .it-off { display: flex; }
+.it.off > .it-c { opacity: .4; }
+.it.off > .it-h { color: var(--text-2); }
+.it.off > .it-h .rs { display: none; }
+/* このデザインで変えられない項目のまとめ (くわしい設定の先頭に 1 行) */
+.supnote { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 10px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: 2px; color: var(--text-2); font-size: 13px; }
+.opts button:disabled, .seg button:disabled { opacity: .4; }
+.partnote { margin: 6px 0 0; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: 2px; color: var(--text-2); font-size: 13px; }
+.partnote[hidden] { display: none; }
+.supnote[hidden] { display: none; }
+.subs { margin: 6px 0 0 2px; padding-left: 10px; border-left: 1px solid var(--line-2); }
+.subs .it { margin-top: 8px; }
+.subs .it:first-child { margin-top: 0; }
+.subs:empty, .subs.none { display: none; }
+.labelin { flex: 1 1 auto; min-width: 0; }
+.cnt { flex: none; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* 色: おすすめ配色はコンパクトなリスト */
+.pals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.pal { display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px; margin: -1px 0 0 -1px; padding: 2px 6px; border: 1px solid var(--line-2); border-radius: 0; background: var(--field); text-align: left; }
+.pal:hover:not(:disabled) { background: var(--raised); }
+.pal[aria-pressed="true"] { border-color: var(--accent-mark); box-shadow: inset 0 0 0 1px var(--accent-mark); background: var(--raised); }
+.pal .dots { display: flex; flex: none; }
+.pal .dots span { width: 12px; height: 12px; margin-left: 2px; border-radius: 1px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+:root[data-theme="light"] .pal .dots span { box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.pal .dots span:first-child { margin-left: 0; }
+.pal .pn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+details.fold { margin-top: 6px; }
+details.fold > summary, details.more > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; user-select: none; }
+details.fold > summary::-webkit-details-marker, details.more > summary::-webkit-details-marker { display: none; }
+details.fold > summary { min-height: 28px; padding: 2px 0; font-size: 13px; color: var(--text-2); }
+details.fold > summary:hover { color: var(--text); }
+.chev { flex: none; width: 6px; height: 6px; margin: 0 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+details[open] > summary .chev { transform: rotate(45deg); }
+details.fold .fold-in { padding: 6px 0 2px 2px; }
+.hexin { width: 92px !important; font-family: Consolas, 'Courier New', monospace; text-transform: lowercase; }
+.hexin[aria-invalid="true"] { border-color: var(--ng); }
+
+/* フォント: 罫のグリッド。名前は 2 行まで折り返して省略しない */
+.fonts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.fbtn { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 0; margin: -1px 0 0 -1px; padding: 3px 3px 3px; border: 1px solid var(--line-2); border-radius: 0; background: var(--field); color: var(--text); text-align: center; }
+.fbtn[hidden] { display: none; }
+.fbtn:hover:not(:disabled) { background: var(--raised); }
+.fbtn[aria-pressed="true"] { border-color: var(--accent-mark); box-shadow: inset 0 0 0 1px var(--accent-mark); background: var(--raised); }
+.fbtn .smp { display: block; max-width: 100%; overflow: hidden; font-size: 19px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fbtn .fn { display: block; max-width: 100%; font-size: 13px; line-height: 1.25; letter-spacing: -.02em; color: var(--text-3); text-wrap: balance; overflow-wrap: break-word; }
+.fbtn .fn .fnp { display: inline-block; }   /* 標準の「(フォント名)」は途中で切らずに 2 行目へ */
+.fbtn.def .fn { color: var(--text-2); }
+.fbtn[aria-pressed="true"] .fn { color: var(--text); }
+.fmore { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+.fmore.btn.ghost { padding-left: 0; color: var(--accent-text); }
+.fmore.btn.ghost:hover:not(:disabled) { padding-left: 6px; }
+
+/* 大きさ */
+.rangebox { display: flex; align-items: center; gap: 8px; width: 100%; }
+.rangebox input[type=range] { flex: 1 1 auto; }
+.rangebox .unit { margin-left: -4px; color: var(--text-2); }
+
+/* くわしい設定 (開閉する帯) */
+details.more > summary { white-space: nowrap; min-height: 28px; padding: 3px 10px; background: var(--strip); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+details.more > summary:hover { background: var(--strip-hover); }
+details.more > summary .sub { min-width: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 400; color: var(--text-3); }
+details.more .more-in { padding: 8px 10px 10px; }
+.posbox { display: flex; align-items: center; gap: 12px; }
+/* 表示位置: OBS の枠を模した 3×3 */
+.obsframe { position: relative; flex: none; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; width: 150px; height: 98px; padding: 3px; border: 1px dashed var(--box); background: var(--field); }
+.obsframe button { display: flex; min-height: 28px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.obsframe button span { width: 6px; height: 6px; margin: auto; background: var(--line-3); }
+.obsframe button:hover:not(:disabled) { background: var(--raised); }
+.obsframe button:hover:not(:disabled) span { background: var(--text-2); }
+.obsframe button[aria-pressed="true"] span { width: 36px; height: 16px; background: var(--accent-mark); }
+.obsframe button.l span { margin-left: 3px; }
+.obsframe button.r span { margin-right: 3px; }
+.obsframe button.t span { margin-top: 3px; }
+.obsframe button.b span { margin-bottom: 3px; }
+.posinfo { min-width: 0; font-size: 13px; color: var(--text-3); }
+.posinfo b { display: block; font-size: 13px; color: var(--text); }
+.tzsel { width: 100%; }
+.resetall { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 10px 10px; border-top: 1px solid var(--line); }
+.resetall .note { font-size: 13px; color: var(--text-3); }
+.resetall .btn .ic { display: none; }
+
+/* ================= ダイアログ ================= */
+dialog { max-width: min(480px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line-3); border-radius: 3px; background: var(--panel); color: var(--text); }
+dialog::backdrop { background: var(--backdrop); }
+.dlg-in { padding: 14px 16px; }
+dialog h3 { margin: 0 0 8px; padding-right: 32px; font-size: 15px; font-weight: 600; }
+dialog h3:focus { outline: none; }
+dialog p { color: var(--text-2); font-size: 13px; }
+dialog .acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 14px -16px -14px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--strip); }
+.dlg-x { position: absolute; right: 6px; top: 6px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 2px; background: transparent; color: var(--text-2); }
+.dlg-x:hover { background: var(--raised-2); color: var(--text); }
+/* 有料版の案内 */
+.paid-img { position: relative; display: flex; align-items: center; justify-content: center; height: 150px; margin: 0 0 12px; overflow: hidden; border: 1px solid var(--line); background: var(--thumb-bg); }
+.paid-img img { display: block; width: 100%; height: 100%; padding: 14px 18px; object-fit: contain; }
+.paid-img .lockmark { right: 6px; top: 6px; display: inline-flex; }
+
+/* 大きく並べて選ぶ */
+dialog.gal { width: min(1600px, calc(100vw - 24px)); max-width: none; height: calc(100vh - 24px); max-height: none; }
+dialog.gal[open] { display: flex; flex-direction: column; }
+.gal-h { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 48px 6px 12px; background: var(--strip); border-bottom: 1px solid var(--line); }
+.gal-h h3 { margin: 0; padding: 0; font-size: 13.5px; white-space: nowrap; }
+.gal-h .search { flex: 0 1 300px; }
+.gal-h .chips { flex: 1 1 100%; }
+.gal-h .chip { padding: 0 10px; }
+.gal-h .dmeta { flex: 1 1 100%; }
+.gal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 8px 10px; }
+.gal-body .ghead { margin: 0 -8px 4px; padding: 3px 10px; }
+.gal-body .dgrid { grid-template-columns: repeat(auto-fill, minmax(max(210px, calc((100% - 20px) / 6)), 1fr)); gap: 4px; }
+.gal-body .card .thumb { height: 120px; }
+.gal-body .card .thumb img { padding: 10px 14px; }
+.gal-body .card .nm { padding: 3px 3px 2px; }
+.gal-body .card .lockmark { right: 6px; top: 6px; }
+
+/* OBS への入れ方 */
+dialog.howto { width: min(940px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 32px); }
+dialog.howto[open] { display: flex; flex-direction: column; }
+dialog.howto .dlg-in { overflow-y: auto; padding: 14px 16px 14px; }
+dialog.howto .acts { position: sticky; bottom: -14px; }
+.howto h4 { margin: 14px 0 4px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--strip); font-size: 13.5px; font-weight: 600; }
+.howto .lead { margin: 0 0 12px; color: var(--text-2); }
+.obswrap { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 24px; }
+/* OBS の画面を模した図 (テーマに関係なく OBS と同じ暗いグレー) */
+.mock { flex: 0 1 410px; min-width: 280px; color: #e6e6e6; font-size: 14px; }
+.mock .win { overflow: hidden; border: 1px solid #4a4a4a; border-radius: 2px; background: #2b2b2b; }
+.mock .tbar { display: flex; justify-content: space-between; padding: 5px 12px; background: #1f1f1f; color: #c4c4c4; font-size: 13px; }
+.mock .mrow { display: grid; grid-template-columns: 30px 90px minmax(0, 1fr); align-items: center; gap: 8px; padding: 8px 12px 8px 8px; border-bottom: 1px solid #383838; }
+.mock .bd { width: 24px; height: 24px; border-radius: 2px; background: #3574c4; color: #fff; font-size: 13px; font-weight: 600; line-height: 24px; text-align: center; }
+.mock .ml { color: #d6d6d6; }
+.mock .chk { display: inline-flex; align-items: center; gap: 8px; }
+.mock .box { width: 18px; height: 18px; border: 2px solid #8a8a8a; border-radius: 2px; background: #1a1a1a; }
+.mock .field-in { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 30px; padding: 3px 8px; border: 1px solid #4a4a4a; border-radius: 2px; background: #1a1a1a; color: #e6e6e6; }
+.mock .field-in span.u { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: Consolas, monospace; font-size: 13px; }
+.mock button.field-in { width: 100%; border-color: #4a8fd8; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: left; }
+.mock button.field-in:hover { background: #262626; }
+.mock button.field-in small { color: #9cc3ef; font-size: 13px; font-weight: 400; }
+.mock .dim { color: #a6a6a6; }
+.mock .btnrow { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px 10px; background: #252525; }
+.mock .btnrow span { padding: 1px 16px; border: 1px solid #4a4a4a; border-radius: 2px; background: #343434; color: #c4c4c4; }
+.mock .src { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 12px; }
+.mock .srcbar { display: flex; align-items: center; gap: 10px; padding: 5px 12px; border: 1px solid #4a4a4a; border-radius: 2px; background: #2b2b2b; color: #c4c4c4; }
+.mock .plus { width: 24px; height: 24px; border: 1px solid #8a8a8a; border-radius: 2px; color: #e6e6e6; font-size: 18px; line-height: 20px; text-align: center; }
+.mock .plusmenu { margin-left: auto; color: #c4c4c4; font-size: 13px; }
+.mock .cap { margin: 8px 0 0; color: var(--text-3); font-size: 13px; }
+/* 手順: 四角い番号 + 押す場所の名前はキー風の枠 */
+.proc { flex: 1 1 280px; min-width: 0; }
+.proc ol { margin: 0; padding: 0; list-style: none; counter-reset: p; }
+.proc li { position: relative; padding: 1px 0 10px 34px; counter-increment: p; font-size: 13px; }
+.proc li::before { content: counter(p); position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 2px; background: var(--raised-2); color: var(--text); font-size: 13px; font-weight: 600; line-height: 22px; text-align: center; }
+.proc li.done::before { content: '\2713'; background: var(--ok-bg); color: #fff; }
+.proc li .donetag { display: none; margin-left: 6px; padding: 0 6px; border: 1px solid var(--ok); border-radius: 2px; color: var(--ok); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.proc li.done .donetag { display: inline-block; }
+.proc .nw { white-space: nowrap; }
+.proc li b { padding: 0 5px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); color: var(--text); font-weight: 600; }
+.sizecard { margin-top: 2px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); font-size: 13px; }
+.sizecard .nums { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; }
+.sizecard .nums button { min-height: 30px; padding: 2px 10px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--panel); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sizecard .nums button:hover { border-color: var(--accent-mark); }
+.sizecard .nums .x { color: var(--text-3); }
+.sizecard .note { font-size: 13px; color: var(--text-2); }
+.trouble details { border-top: 1px solid var(--line); }
+.trouble details:first-of-type { border-top: 0; }
+.trouble summary { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 4px 0; font-size: 13px; font-weight: 600; list-style: none; cursor: pointer; }
+.trouble summary:hover { color: var(--text); background: var(--raised); }
+.trouble summary::-webkit-details-marker { display: none; }
+.trouble summary::before { content: ''; flex: none; width: 6px; height: 6px; margin-left: 4px; border-right: 1.5px solid var(--text-3); border-bottom: 1.5px solid var(--text-3); transform: rotate(-45deg); transition: transform .15s; }
+.trouble details[open] summary::before { transform: rotate(45deg); }
+.trouble details p { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); font-size: 13px; }
+/* URL から読み込む */
+.import textarea { width: 100%; height: 80px; padding: 6px 8px; border: 1px solid var(--line-2); border-radius: 2px; background: var(--field); color: var(--text); font-family: Consolas, monospace; font-size: 13px; resize: vertical; }
+.import textarea:hover { border-color: var(--line-3); }
+.import textarea:focus { border-color: var(--accent-mark); outline: none; }
+.msg { min-height: 1.4em; margin-top: 6px; font-size: 13px; }
+.msg.ok { color: var(--ok); }
+.msg.ng { color: var(--ng); }
+/* この画面の使い方 */
+.usage ol { margin: 0 0 4px; padding-left: 0; list-style: none; }
+.usage li { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.usage li .num { min-width: 18px; margin-top: 1px; }
+.usage li b { display: block; font-weight: 600; }
+.usage li span.d { color: var(--text-2); font-size: 13px; }
+
+/* 狭い画面用のタブ (幅 1000px 以上では出さない) */
+.mtabs { display: none; }
+
+/* ================= 幅ごとの調整 ================= */
+@media (min-width: 1600px) {
+  :root { --lw: 440px; --rw: 400px; --dcols: 3; --th: 64px; }
+}
+@media (min-width: 1000px) and (max-width: 1365px) {
+}
+@media (min-width: 1000px) and (max-width: 1199px) {
+  :root { --lw: 216px; --rw: 330px; --dcols: 1; --th: 58px; }
+  .hint .ht { display: none; }
+  .hint .ht-s { display: inline; }
+  .btn.small.rndbtn .ic { display: inline-flex; }   /* 文字を隠すぶん、アイコンを出す */
+  .copybtn { min-width: 0; padding: 5px 12px; }
+  .obs-h .links .lt { display: none; }
+  .obs-h .links .lt-s { display: inline; }
+  .pvtop .lbl { display: none; }
+  .col-design .col-head .lbl, .rndbtn .lbl { display: none; }
+  .col-design .col-head .btn { padding: 0 6px; }
+  .frametgl .ft-l { display: none; }
+  .frametgl .ft-s { display: inline; }
+  .fonts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 999px) {
+  /* 狭い画面: プレビューと「URL をコピー」を上に固定し、その下を [デザイン] [調整] のタブで切り替える。ページは縦スクロール */
+  .top { flex-wrap: wrap; }
+  .hint { order: 9; flex: 1 1 100%; margin: 0 -8px; padding: 2px 4px 0 8px; border-left: 0; border-top: 1px solid var(--line); }
+  .hint .ht { display: none; }
+  .hint .ht-n { display: inline; flex: 1 1 auto; }
+  .hint:not([hidden]) + .tbtns { margin-left: auto; }
+  .app { display: flex; flex-direction: column; gap: 0; padding: 0; }
+  .col-center { order: -1; position: sticky; top: 0; z-index: 30; gap: 4px; padding: 4px 4px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .pvtop .lbl, .frametgl { display: none; }
+  .stage { height: 170px; }
+  .urltext, .openbtn { display: none !important; }
+  .obs-row { flex-wrap: wrap; }
+  .obsbar.copyfail .urltext { display: block !important; flex: 1 1 100%; min-height: 28px; }   /* コピーできなかったときだけ URL 欄を出す */
+  .copybtn { min-width: 0; padding: 5px 16px; }
+  .obs-h .links .lt { display: none; }
+  .obs-h .links .lt-s { display: inline; }
+  .obs-h .num { display: none; }   /* 上下に並ぶので ①②③ の順にならない。番号は外す */
+  .mtabs { display: flex; margin: 0 -4px; border-top: 1px solid var(--line); background: var(--panel); }
+  .mtabs button { position: relative; flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 6px 10px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--text-2); font-size: 14px; font-weight: 600; }
+  .mtabs button:first-child { border-left: 0; }
+  .mtabs button:hover { background: var(--raised); color: var(--text); }
+  .mtabs button[aria-selected="true"] { background: var(--strip); color: var(--text); }
+  .mtabs button[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-mark); }
+  .col-design, .col-adjust { margin: 4px; overflow: visible; }
+  .col-design .col-head h2, .col-adjust > .col-head { display: none; }
+  .col-design .col-head { justify-content: flex-end; }
+  .dlist, .adj { overflow: visible; }
+  .ghead { position: static; }
+  body[data-mtab="design"] .col-adjust, body[data-mtab="adjust"] .col-design { display: none; }
+  :root { --dcols: 3; --th: 64px; }
+}
+@media (max-width: 640px) {
+  :root { --dcols: 2; }
+  .brand h1 small { display: none; }
+  .sizebox .lbl2 { display: none; }
+  .hint .ht-n { white-space: normal; }
+}
+</style>
+</head>
+<body data-mtab="design">
+
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+    <h1><span id="appTitle"></span><small id="ver"></small></h1>
+  </div>
+  <span class="badge" id="ed"></span>
+  <div class="hint" id="hint" hidden>
+    <span class="ht" data-i18n-html="hint_intro_html"></span>
+    <span class="ht-s" data-i18n-html="hint_short_html"></span>
+    <span class="ht-n" data-i18n="hint_narrow"></span>
+    <button class="x" type="button" id="hintX" data-i18n-attr="aria-label:hint_close_aria;title:close"></button>
+  </div>
+  <div class="tbtns">
+    <button class="pillbtn" id="helpBtn" type="button"></button>
+    <button class="pillbtn" id="themeBtn" type="button"></button>
+    <label class="langbox" id="langBox"><select id="langSel" data-i18n-attr="aria-label:lang_aria;title:lang_label"></select></label>
+  </div>
+</header>
+
+<main class="app" id="app">
+  <!-- ① デザイン -->
+  <section class="col col-design panel" id="colDesign" aria-labelledby="hDesign"></section>
+
+  <!-- 中央: プレビュー + ③ OBS に入れる -->
+  <div class="col col-center">
+    <section class="pvpanel panel" data-i18n-attr="aria-label:preview">
+      <div class="pvtop">
+        <span class="lbl" data-i18n="preview"></span>
+        <span class="dn" id="pvName"></span>
+        <span class="pos" id="pvPos"></span>
+        <label class="frametgl" data-i18n-attr="title:frame_toggle_title"><input type="checkbox" id="frameTgl" checked><span class="ft-l" data-i18n="frame_toggle"></span><span class="ft-s" data-i18n="frame_toggle_short"></span></label>
+      </div>
+      <div class="stage bg-dark showframe" id="stage">
+        <div class="frame" id="pvframe"><iframe id="pv" data-i18n-attr="title:preview_iframe_title" tabindex="-1"></iframe></div>
+        <button class="nav prev" type="button" id="navPrev"></button>
+        <button class="nav next" type="button" id="navNext"></button>
+        <span class="trialtag" id="trialTag" aria-live="polite"></span>
+        <div class="toast" id="toast" role="status"></div>
+        <span class="scale" id="pvScale"></span>
+      </div>
+    </section>
+
+    <section class="obsbar panel" id="obsbar" aria-labelledby="hObs"></section>
+
+    <div class="mtabs" role="tablist" data-i18n-attr="aria-label:mtabs_aria">
+      <button type="button" role="tab" id="mtDesign" data-t="design" data-i18n="mtab_design"></button>
+      <button type="button" role="tab" id="mtAdjust" data-t="adjust" data-i18n="mtab_adjust"></button>
+    </div>
+  </div>
+
+  <!-- ② 好みに調整 -->
+  <section class="col col-adjust panel" id="colAdjust" aria-labelledby="hAdjust"></section>
+</main>
+
+<!-- 有料版の案内 -->
+<dialog id="dlgPaid" aria-labelledby="paidTitle">
+  <div class="dlg-in">
+    <div class="paid-img" id="paidImgBox"><img id="paidImg" alt=""><span class="lockmark" id="paidLock"></span></div>
+    <h3 id="paidTitle" tabindex="-1" autofocus data-i18n="paid_design"></h3>
+    <p id="paidBody" style="margin:0"></p>
+    <div class="acts">
+      <button class="btn" id="paidClose" type="button" data-i18n="close"></button>
+      <a class="btn primary" id="paidGo" target="_blank" rel="noopener" data-i18n="see_paid"></a>
+    </div>
+  </div>
+</dialog>
+
+<!-- 大きく並べて選ぶ -->
+<dialog class="gal" id="dlgGal" aria-labelledby="galTitle">
+  <button class="dlg-x" type="button" id="galX" data-i18n-attr="aria-label:close"></button>
+  <div class="gal-h" id="galHead"><h3 id="galTitle" tabindex="-1" autofocus data-i18n="gal_title"></h3></div>
+  <div class="gal-body" id="galBody"></div>
+</dialog>
+
+<!-- OBS への入れ方 -->
+<dialog class="howto" id="dlgHowto" aria-labelledby="howtoTitle">
+  <button class="dlg-x" type="button" id="howtoX" data-i18n-attr="aria-label:close"></button>
+  <div class="dlg-in" id="howtoIn"></div>
+</dialog>
+
+<!-- URL から読み込む -->
+<dialog class="import" id="dlgImport" aria-labelledby="impTitle" style="width:min(560px, calc(100vw - 32px))">
+  <div class="dlg-in" id="importIn"></div>
+</dialog>
+
+<!-- 使い方 -->
+<dialog class="usage" id="dlgUsage" aria-labelledby="usageTitle" style="width:min(520px, calc(100vw - 32px))">
+  <div class="dlg-in" id="usageIn"></div>
+</dialog>
+
+<!-- すべて最初の状態に戻す (確認) -->
+<dialog id="dlgReset" aria-labelledby="resetTitle">
+  <div class="dlg-in">
+    <h3 id="resetTitle" tabindex="-1" data-i18n="reset_title"></h3>
+    <p style="margin:0" data-i18n="reset_body"></p>
+    <div class="acts">
+      <button class="btn" id="resetNo" type="button" autofocus data-i18n="cancel"></button>
+      <button class="btn primary" id="resetYes" type="button" data-i18n="reset_yes"></button>
+    </div>
+  </div>
+</dialog>
+
+<script src="clock-data.js"></script>
+<script src="i18n/lang.js"></script>
+<script>
+(function () {
+'use strict';
+var CS = window.ClockStudio, D = CS.DEFAULTS;
+var FREE = CS.EDITION === 'free';
+
+/* ---------- 言語 ----------
+ * 画面の言語 (uiLang): localStorage (LG.STORE_KEY) → 無ければ navigator.languages から detect。右上で切り替え (保存して reload)。
+ * 時計の言語 (cfg.lang): clock-data.js の DEFAULTS に lang があるときだけ「時計の言葉」を出す (feature detect)。
+ * i18n/lang.js が読めないときは、下の fallbackLang() (日本語だけ) で今までどおり動く。 */
+var LG = window.ClockStudioLang || fallbackLang();
+var LANG_KEY = LG.STORE_KEY || 'clockStudio.lang.v1';
+var uiLang = (function () {
+  var s = lsGet(LANG_KEY);
+  if (LG.has(s)) return s;
+  var nl = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+  var d = LG.detect(nl);
+  if (!LG.has(d)) d = LG.DEFAULT;
+  lsSet(LANG_KEY, d);   /* 初回に決めた言語を覚える (以後は保存値) */
+  return d;
+})();
+var HAS_LANG = !LG.fallback && Object.prototype.hasOwnProperty.call(D, 'lang');   /* 時計側が lang に対応しているか */
+function T(key, vars) { return LG.t(uiLang, key, vars); }
+function langInfo(id) { for (var i = 0; i < LG.LANGS.length; i++) if (LG.LANGS[i].id === id) return LG.LANGS[i]; return LG.LANGS[0]; }
+/* 文の途中に DOM 部品を差し込む文言: slots = { link: 要素, … } */
+function appendParts(host, key, vars, slots) {
+  LG.parts(uiLang, key, vars, Object.keys(slots)).forEach(function (p) {
+    host.appendChild(typeof p === 'string' ? document.createTextNode(p) : slots[p.slot]);
+  });
+  return host;
+}
+/* 名前 (デザイン・系統・色): ja は clock-data.js の値、訳が無ければ ja にフォールバック */
+function dName(d) { return LG.designName(uiLang, d); }
+function gName(g) { return LG.groupName(uiLang, g); }
+/* 時計の言語 (lang が無い間は ja 固定) */
+function clockLang() { return HAS_LANG && LG.has(cfg.lang) ? cfg.lang : 'ja'; }
+/* 時計の言語を変えたあと: その言語で使えない日付書式・AM/PM を直す。old = 変える前の言語 (df が旧言語の既定なら新言語の既定に寄せる) */
+function fixClockLang(old) {
+  var C = LG.C(clockLang());
+  if (old && old !== clockLang() && cfg.df === LG.C(old).dfDefault) cfg.df = C.dfDefault;
+  if (C.dfList.indexOf(cfg.df) < 0) cfg.df = C.dfDefault;
+  if (C.apOptions.indexOf(cfg.ap) < 0) cfg.ap = 'en';
+}
+/* 静的な HTML の文言を入れる (data-i18n / data-i18n-html / data-i18n-attr="属性:キー;…") */
+function applyI18nDom() {
+  document.title = T('page_title');
+  document.documentElement.lang = langInfo(uiLang).htmlLang;
+  document.documentElement.style.setProperty('--locked-sfx', JSON.stringify(T('locked_suffix_css')));
+  $('appTitle').textContent = T('app_title');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (e) { e.textContent = T(e.getAttribute('data-i18n')); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-html]'), function (e) {
+    var k = e.getAttribute('data-i18n-html');
+    if (/_html$/.test(k)) e.innerHTML = T(k);   /* _html のキーだけ (中身は辞書の固定文字列で <b> のみ) */
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-i18n-attr]'), function (e) {
+    e.getAttribute('data-i18n-attr').split(';').forEach(function (p) { var kv = p.split(':'); if (kv.length === 2) e.setAttribute(kv[0], T(kv[1])); });
+  });
+}
+/* 右上の言語切り替え: 保存して reload (UI は起動時に一度だけ組み立てるため) */
+function buildLangSel() {
+  var sel = $('langSel'), box = $('langBox');
+  if (LG.LANGS.length < 2) { box.style.display = 'none'; return; }
+  box.insertBefore(icon('globe'), sel);
+  LG.LANGS.forEach(function (l) { sel.appendChild(h('option', { value: l.id, text: l.name, lang: l.htmlLang })); });
+  sel.value = uiLang;
+  sel.addEventListener('change', function () {
+    var nl = sel.value;
+    if (!LG.has(nl) || nl === uiLang) return;
+    /* 時計の言語が画面の言語と同じだったら、いっしょに切り替える (わざと別の言語にしているときはそのまま) */
+    if (HAS_LANG && cfg.lang === uiLang) { var old = cfg.lang; cfg.lang = nl; fixClockLang(old); save(); }
+    lsSet(LANG_KEY, nl);
+    location.reload();
+  });
+}
+/* lang.js が無いときの代わり (日本語だけ)。中身は node _dev\i18n\embed-fallback.js が lang.js から生成する */
+function fallbackLang() {
+  /* LANG-FALLBACK:START */
+  /* 生成物: node _dev/i18n/embed-fallback.js (lang.js の ui.ja と clock.ja の写し。直接直さない) */
+  var UI = {
+    "page_title": "きせかえ時計 Clock Studio 設定",
+    "app_title": "きせかえ時計 Clock Studio",
+    "ver_suffix": "v{ver} ・ 設定画面",
+    "edition_free": "無料版",
+    "edition_paid": "有料版",
+    "hint_intro_html": "はじめに: <b>①</b> 左でデザインを選ぶ → <b>②</b> 右で好みに調整 → <b>③</b> 中央下の「URL をコピー」を OBS に貼る",
+    "hint_short_html": "<b>①</b> 左で選ぶ → <b>②</b> 右で調整 → <b>③</b> 下でコピー",
+    "hint_narrow": "はじめに: デザインを選ぶ → 調整 → 上の「URL をコピー」を OBS に貼る",
+    "hint_close_aria": "このヒントを閉じる",
+    "close": "閉じる",
+    "cancel": "やめる",
+    "help_btn": "使い方",
+    "help_aria": "この画面の使い方",
+    "theme_dark": "ダークにする",
+    "theme_light": "ライトにする",
+    "theme_to_dark": "ダークテーマに切り替える",
+    "theme_to_light": "ライトテーマに切り替える",
+    "lang_label": "言語",
+    "lang_aria": "画面の言語を切り替える",
+    "preview": "プレビュー",
+    "frame_toggle": "OBS の枠を表示",
+    "frame_toggle_short": "枠を表示",
+    "frame_toggle_title": "OBS のブラウザソースの枠 (破線) をプレビューに重ねます",
+    "preview_iframe_title": "時計のプレビュー",
+    "scale_shrunk": "{p}% に縮小表示中",
+    "trial_prefix": "試し表示: ",
+    "trial_click": "クリックで決定",
+    "nav_prev": "前のデザイン",
+    "nav_next": "次のデザイン",
+    "nav_pos": "{i} / {n}",
+    "nav_pos_group": " ({group})",
+    "nav_pos_fav": " (お気に入り)",
+    "nav_pos_filtered": " (絞り込み中)",
+    "mtabs_aria": "設定の切り替え",
+    "mtab_design": "デザイン",
+    "mtab_adjust": "調整",
+    "h_design": "デザインを選ぶ",
+    "big_btn": "大きく並べて選ぶ",
+    "big_btn_title": "画面いっぱいに大きく並べて選びます",
+    "gal_title": "デザインを大きく並べて選ぶ",
+    "search_placeholder": "名前で探す (例: ねおん)",
+    "search_aria": "デザインを名前で探す",
+    "random": "おまかせ",
+    "random_aria": "おまかせ (ランダムに選ぶ)",
+    "random_title": "使えるデザインからランダムに 1 つ選びます",
+    "random_title_big": "使えるデザインからランダムに選びます",
+    "chips_aria": "デザインの系統で絞り込む",
+    "chip_all": "すべて",
+    "chip_fav": "お気に入り",
+    "clear_filters": "絞り込みを解除",
+    "only_free": "使えるデザインだけ表示",
+    "count_filtered": "{vis} / {total} 種類を表示中",
+    "count_all": "全 {total} 種類",
+    "group_count": "{n} 種類",
+    "empty_fav": "お気に入りはまだありません。カードの ☆ (キーボードでは F キー) を押すと、ここに集まります。",
+    "empty_none": "この条件に合うデザインがありません。",
+    "paid_tag": "有料版",
+    "locked_suffix_css": " ・有料版",
+    "locked_aria": "{name} (有料版のデザイン)",
+    "paid_design": "有料版のデザインです",
+    "fav_add": "お気に入りに追加 (F キー)",
+    "fav_remove": "お気に入りから外す (F キー)",
+    "fav_add_aria": "{name}をお気に入りに追加",
+    "fav_remove_aria": "{name}をお気に入りから外す",
+    "toast_fav_added": "「{name}」をお気に入りに追加しました",
+    "toast_fav_removed": "「{name}」をお気に入りから外しました",
+    "toast_reset_colors": "色とフォントをこのデザインの標準に戻しました",
+    "paid_dialog_title": "「{name}」は有料版のデザインです",
+    "paid_dialog_body": "無料版で使えるのは、{list}の {n} 種類です。有料版では全 {total} 種類のデザインのほか、色・フォント・フチ・時刻の変わり方も自由に変えられます。",
+    "list_sep": "・",
+    "see_paid": "有料版を見る",
+    "h_adjust": "好みに調整",
+    "autosave": "設定は自動で保存されます",
+    "off_sup": "このデザインでは変えられません",
+    "off_paid": "有料版で変えられます",
+    "lock_note": "無料版では固定です",
+    "reset_item": "元に戻す",
+    "reset_item_title": "最初の状態に戻す",
+    "reset_item_aria": "{label}を元に戻す",
+    "hex_aria": "{label} (HEX)",
+    "number_aria": "{label} (数値)",
+    "quick_aria": "{label}をすばやく選ぶ",
+    "sec_display": "表示",
+    "tg_aria": "表示するもの",
+    "tg_sec": "秒",
+    "tg_sec_title": "秒を出す (オフで時計が小さくなります)",
+    "tg_date": "日付",
+    "tg_date_title": "時計に日付も出す",
+    "tg_h12": "12 時間表示",
+    "tg_h12_title": "18:30 ではなく 6:30 PM のように出す",
+    "tnote_h12_off": "12 時間表示は、{reason}",
+    "df_label": "日付の書き方",
+    "df_hint": "ボタンは表示例です",
+    "df_tanzaku_off": "短冊では日本語の書式になります",
+    "lay_label": "日付の場所",
+    "lay_hint": "時刻から見た位置",
+    "lay_v": "上",
+    "lay_vr": "下",
+    "lay_h": "左",
+    "lay_hr": "右",
+    "ap_label": "AM/PM の書き方",
+    "ap_en": "AM / PM",
+    "ap_jp": "午前 / 午後",
+    "ap_off": "出さない",
+    "clock_lang_label": "時計の言葉",
+    "clock_lang_hint": "曜日や午前/午後などを何語で出すか",
+    "label_label": "ひとこと",
+    "label_hint": "時計に添える短い文字",
+    "label_placeholder": "例: JST / 配信中",
+    "label_count": "{n} / 30",
+    "sec_color": "色",
+    "sec_color_sub": "まずはおすすめ配色から",
+    "pal_label": "おすすめ配色",
+    "pal_original": "標準",
+    "pal_original_title": "このデザインの標準の色",
+    "pal_title": "おすすめ配色「{name}」",
+    "pal_fallback_name": "配色",
+    "fold_colors": "1 色ずつ変える",
+    "color_generic": "色",
+    "color_n": "色{n}",
+    "color_note": "色見本をクリック、または #ff8800 のように入力します。",
+    "sec_font": "フォント",
+    "sec_font_sub": "文字の形",
+    "font_default": "このデザインの標準",
+    "font_std": "標準",
+    "font_own": "このデザイン専用",
+    "font_default_title": "このデザインの標準のフォント",
+    "font_own_title": "このデザイン専用のフォントです",
+    "fonts_collapse": "たたむ",
+    "fonts_more": "ほかのフォントも見る (あと {n} 種類)",
+    "font_note": "フォントはネットから読み込みます。つながっていないときは代わりのフォントになります。",
+    "sec_size": "大きさ",
+    "size_label": "時計の大きさ",
+    "size_hint": "100% が標準",
+    "more_title": "くわしい設定",
+    "more_changed": "{n} 項目を変更中",
+    "more_sub": "フチ・影・時刻の変わり方・位置 など",
+    "more_locknote": "鍵マークの項目は有料版で変えられます",
+    "sup_note": "このデザインでは、{names} は変えられません (薄い表示の項目)。",
+    "ol_label": "文字のフチ",
+    "ol_hint": "ゲーム画面の上でも読みやすく",
+    "olc_label": "フチの色",
+    "olc_hint": "背景と反対の色が目立ちます",
+    "olc_black": "黒",
+    "olc_white": "白",
+    "sh_label": "影",
+    "sh_hint": "文字や板の後ろに影をつけます",
+    "sh_switch": "つける",
+    "anim_label": "時刻の変わり方",
+    "anim_hint": "数字が切り替わるときの動き",
+    "anim_none": "動かさない",
+    "anim_fade": "ふわっと",
+    "anim_slide": "スライド",
+    "anim_pop": "ぽんっと",
+    "blink_label": "コロンの点滅",
+    "blink_hint": "「:」を 1 秒ごとに点滅",
+    "blink_switch": "点滅させる",
+    "pad_label": "9 時台の書き方",
+    "pad_hint": "1 けたの時に 0 をつけるか",
+    "pos_label": "枠の中の位置",
+    "pos_hint": "ふつうは「まん中」で OK",
+    "pos_aria": "OBS の枠の中で時計を寄せる位置",
+    "pos_tl": "左上",
+    "pos_tc": "上",
+    "pos_tr": "右上",
+    "pos_ml": "左",
+    "pos_mc": "まん中",
+    "pos_mr": "右",
+    "pos_bl": "左下",
+    "pos_bc": "下",
+    "pos_br": "右下",
+    "pos_now": "いまは「{name}」",
+    "pos_info": "破線の四角が OBS の枠です。枠をおすすめより大きくしたときに効きます。",
+    "tz_label": "タイムゾーン",
+    "tz_hint": "海外の時刻を出したいときに",
+    "reset_all": "すべて最初の状態に戻す",
+    "reset_all_note": "デザインも含めて最初の状態 (プレーン) に戻します。",
+    "tz_local": "この PC の時刻 (標準)",
+    "tz_asia_tokyo": "日本 (東京)",
+    "tz_asia_seoul": "韓国 (ソウル)",
+    "tz_asia_shanghai": "中国 (上海)",
+    "tz_asia_taipei": "台湾 (台北)",
+    "tz_asia_hong_kong": "香港",
+    "tz_asia_singapore": "シンガポール",
+    "tz_asia_bangkok": "タイ (バンコク)",
+    "tz_asia_kolkata": "インド",
+    "tz_asia_dubai": "ドバイ",
+    "tz_europe_london": "イギリス (ロンドン)",
+    "tz_europe_paris": "フランス (パリ)",
+    "tz_europe_berlin": "ドイツ (ベルリン)",
+    "tz_europe_moscow": "ロシア (モスクワ)",
+    "tz_america_new_york": "アメリカ東部 (ニューヨーク)",
+    "tz_america_chicago": "アメリカ中部 (シカゴ)",
+    "tz_america_denver": "アメリカ山岳部 (デンバー)",
+    "tz_america_los_angeles": "アメリカ西部 (ロサンゼルス)",
+    "tz_america_sao_paulo": "ブラジル (サンパウロ)",
+    "tz_pacific_honolulu": "ハワイ",
+    "tz_australia_sydney": "オーストラリア (シドニー)",
+    "tz_pacific_auckland": "ニュージーランド",
+    "tz_utc": "UTC (協定世界時)",
+    "reset_title": "すべて最初の状態に戻しますか?",
+    "reset_body": "デザインも含めて、すべての設定を最初の状態 (プレーン) に戻します。OBS に貼ってある URL はそのままです。",
+    "reset_yes": "戻す",
+    "toast_reset_all": "すべて最初の状態に戻しました",
+    "h_obs": "OBS に入れる",
+    "howto_link": "OBS への入れ方",
+    "import_link": "OBS の URL から読み込む",
+    "import_link_short": "URL から読み込む",
+    "import_link_title": "OBS に貼ってある URL から設定を読み込みます",
+    "import_link_vh": "(OBS に貼ってある URL から設定を読み込む)",
+    "copy_url": "URL をコピー",
+    "copied": "コピーしました",
+    "copy_failed": "コピーできませんでした",
+    "width": "幅",
+    "height": "高さ",
+    "copy_w_title": "幅をコピー",
+    "copy_h_title": "高さをコピー",
+    "copy_w_aria": "幅 {n} をコピー",
+    "copy_h_aria": "高さ {n} をコピー",
+    "sizebox_title": "OBS のブラウザソースに入れる幅と高さ (数字をクリックでコピー)",
+    "url_aria": "OBS 用の URL (クリックで全部選択)",
+    "url_title": "クリックで全部選択",
+    "open_url": "この URL をブラウザで開いて確認",
+    "obs_idle": "設定を変えたときは、URL をコピーし直して OBS に貼り直します。",
+    "copy_ok_msg": "コピーしました。OBS の URL 欄に貼り付け、{size} を入れてください {mac}",
+    "size_wh": "幅 {w} × 高さ {h}",
+    "mac_paste": "(Mac は ⌘ + V)",
+    "copy_ng_msg": "コピーできませんでした。URL 欄の文字を選んだので、{keys} {mac} でコピーしてください。",
+    "mac_copy": "(Mac は ⌘ + C)",
+    "over_msg": "配信画面 (1920×1080) より大きくなっています。大きさを下げてください。",
+    "credit_head": "無料版はクレジット表記をお願いします（配信・動画の概要欄などに）",
+    "credit_line1": "時計素材: きせかえ時計 Clock Studio（雨峰あまね）",
+    "credit_copy": "クレジットをコピー",
+    "credit_copied": "クレジットをコピーしました",
+    "credit_box_aria": "コピー用のクレジット文",
+    "credit_rt": "告知ポストのリポスト (RT) でも OK です。",
+    "credit_paid": "有料版はクレジット不要",
+    "credit_close": "閉じる",
+    "howto_lead": "OBS の「ブラウザ」ソースの画面は、こんな見た目です。番号の場所を、手順どおりに設定します。",
+    "mock_aria": "OBS のブラウザソースのプロパティ画面の図",
+    "mock_sources": "ソース",
+    "mock_pick_browser": "→「ブラウザ」を選ぶ",
+    "mock_props_title": "「ブラウザ」のプロパティ",
+    "mock_local_file": "ローカルファイル",
+    "mock_unchecked": "← チェックなし",
+    "mock_url": "URL",
+    "mock_click_copy_title": "クリックで数字をコピー",
+    "mock_click_copy": "クリックでコピー",
+    "mock_ok": "OK",
+    "mock_cancel": "キャンセル",
+    "mock_caption": "※ 図の幅と高さには、いまの設定のおすすめサイズが入っています。",
+    "step1_html": "この画面の <b>URL をコピー</b> を押します。",
+    "step_done": "済み",
+    "step2_html": "OBS の「ソース」の <b>+</b> を押し、<b>ブラウザ</b> を選んで追加します。(名前は何でも OK)",
+    "step3_html": "<b>ローカルファイル</b> のチェックを外します。<b>URL</b> 欄に最初から入っている文字を消してから、コピーした URL を貼り付けます。(Ctrl + V)",
+    "step4_html": "<b>幅</b> と <b>高さ</b> に、下の数字を入れて OK を押します。",
+    "sizecard_title": "いまの設定のおすすめサイズ (数字をクリックでコピー)",
+    "size_note_measured": "時計の実際の大きさに、上下左右 {m}px ずつの余白を足した値です。秒や日付を変えると数字も変わります。",
+    "size_note_estimate": "おおよその目安です (プレビューの計測が終わると正確な値に変わります)。",
+    "howto_h_noconfig": "設定を変えずに、そのまま使うなら",
+    "howto_noconfig": "OBS のブラウザソースで「ローカルファイル」にチェックを入れ、このフォルダの clock.html を選ぶだけで、標準のデザイン (プレーン) の時計が出ます。(幅・高さの目安: 幅 350 × 高さ 130)",
+    "howto_h_later": "あとで設定を変えたいとき",
+    "howto_later": "この画面の「{link}」に OBS に貼ってある URL を貼ると、そのときの設定から続きを直せます。直したら、URL をコピーし直して OBS に貼り直します。",
+    "howto_h_trouble": "うまくいかないとき",
+    "trouble_1_q": "URL を貼っても、設定が OBS に反映されない",
+    "trouble_1_a": "ブラウザソースの「ローカルファイル」のチェックが入ったままだと、URL は使われません。チェックを外してから、URL を貼り付けてください。設定を変えたあとは、URL もコピーし直して貼り直します。",
+    "trouble_2_q": "文字や飾りが切れる・はみ出す",
+    "trouble_2_a": "幅と高さが小さすぎます。この画面の「幅 × 高さ」の数字を入れ直してください。秒や日付を足したり、大きさを変えたりすると、おすすめサイズも変わります。",
+    "trouble_3_q": "フォントが設定と違う",
+    "trouble_3_a": "フォントはインターネットから読み込みます。ネットにつながっていないと、代わりのフォントで表示されます。つながっている状態で、ブラウザソースの「現在のページのキャッシュを更新」を押してみてください。",
+    "trouble_4_q": "フォルダを動かしたら表示されなくなった",
+    "trouble_4_a": "URL にはファイルの置き場所が入っています。フォルダを動かしたり名前を変えたりしたときは、この設定画面を開き直して URL を作り直し、OBS に貼り直してください。",
+    "import_title": "OBS に貼ってある URL から設定を読み込む",
+    "import_body": "OBS のブラウザソースの URL 欄からコピーした URL を貼ると、そのときの設定を読み込んで続きから直せます。いまの設定は置き換わります (読み込んだあとに「元に戻す」で戻せます)。直したら、URL をコピーし直して OBS に貼り直します。",
+    "import_placeholder": "OBS に貼ってある URL をここに貼り付け (…/clock.html?… の形)",
+    "import_aria": "読み込む URL",
+    "import_go": "読み込む",
+    "import_empty": "URL を貼り付けてください。",
+    "import_bad": "この URL は時計の URL ではないようです。OBS のブラウザソースの URL 欄 (clock.html で終わり、? のあとに設定が続くもの) をコピーして貼ってください。",
+    "import_done": "設定を読み込みました。続きから直せます。",
+    "import_paid_design": "「{name}」は有料版のデザインなので、{fallback}で読み込みました",
+    "import_paid_dropped_suffix": "。色・フォントなど有料版の設定も外しました",
+    "import_dropped": "設定を読み込みました。色・フォントなど有料版の設定は外しました",
+    "import_undo": "元に戻す",
+    "import_undone": "読み込む前の設定に戻しました",
+    "usage_title": "この画面の使い方",
+    "usage_1_t": "デザインを選ぶ (左)",
+    "usage_1_d": "カードをクリックで決定。マウスを乗せると、プレビューで試し表示できます。プレビューの ◀ ▶ でも順番に切り替えられます。キーボードでは矢印キーで選び、F キーでお気に入りに追加・削除できます。",
+    "usage_2_t": "好みに調整 (右)",
+    "usage_2_d": "秒・日付・色・フォント・大きさなど。設定は自動で保存されます。",
+    "usage_3_t": "OBS に入れる (中央下)",
+    "usage_3_d": "「URL をコピー」を押し、OBS のブラウザソースの URL 欄に貼ります。幅と高さは横の数字を入れます。",
+    "usage_howto_btn": "OBS への入れ方を見る"
+  };
+  var DFX = {"jp":"10月3日(土)","jpy":"2026年10月3日(土)","wareki":"令和8年10月3日(土)","slash":"2026/10/03 Sat","dot":"2026.10.03 SAT","en":"Sat, Oct 3"};
+  var CJ = {"dfList":["jp","jpy","wareki","slash","dot","en"],"dfDefault":"jp","apOptions":["en","jp","off"]};
+  var SELF = "日本語";
+  /* LANG-FALLBACK:END */
+  function fill(s, v) { return String(s).replace(/\{(\w+)\}/g, function (m, k) { return v && v.hasOwnProperty(k) ? String(v[k]) : m; }); }
+  var L = {
+    fallback: true, LANGS: [{ id: 'ja', name: SELF, htmlLang: 'ja' }], DEFAULT: 'ja', STORE_KEY: 'clockStudio.lang.v1',
+    has: function (id) { return id === 'ja'; },
+    detect: function () { return 'ja'; },
+    C: function () { return CJ; },
+    dateExample: function (l, df) { return DFX[df] || df; },
+    t: function (l, k, v) { var s = UI.hasOwnProperty(k) ? UI[k] : k; return v ? fill(s, v) : s; },
+    parts: function (l, k, v, slots) {
+      var s = L.t(l, k, v), out = [], re = /\{(\w+)\}/g, last = 0, m;
+      while ((m = re.exec(s))) { if (slots.indexOf(m[1]) < 0) continue; if (m.index > last) out.push(s.slice(last, m.index)); out.push({ slot: m[1] }); last = re.lastIndex; }
+      if (last < s.length) out.push(s.slice(last));
+      return out;
+    },
+    designName: function (l, d) { return d ? d.name : ''; },
+    groupName: function (l, g) { return g; },
+    colorLabel: function (l, x) { return x; },
+    paletteName: function (l, id, nm) { return nm; },
+    tzKey: function (z) { return z ? 'tz_' + String(z).toLowerCase().replace(/[^a-z0-9]+/g, '_') : 'tz_local'; }
+  };
+  return L;
+}
+var STORE = 'clockStudio.settings.v1';
+var FAVS = 'clockStudio.favs.v1';
+var THEME = 'clockStudio.theme';
+var K_HINT = 'clockStudio.hint.v1';       // 初回ヒントを閉じた
+var K_COPIED = 'clockStudio.copied.v1';   // URL を一度コピーした (入れ方の自動表示は初回だけ)
+var K_MORE = 'clockStudio.more.v1';       // 「くわしい設定」の開閉
+var MARGIN = 20;   // 推奨サイズの余白 (上下左右それぞれ px)
+var HOVER_MS = 150;
+
+/* ---------- アイコン (固定文字列のみ。ユーザー入力は入れない) ---------- */
+var SV = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+var ICONS = {
+  lock: '<svg width="14" height="14" ' + SV + '><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  check: '<svg width="14" height="14" ' + SV + ' stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  star: '<svg width="16" height="16" ' + SV + '><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>',
+  search: '<svg width="15" height="15" ' + SV + '><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  dice: '<svg width="16" height="16" ' + SV + '><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>',
+  sun: '<svg width="16" height="16" ' + SV + '><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  moon: '<svg width="16" height="16" ' + SV + '><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+  help: '<svg width="16" height="16" ' + SV + '><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>',
+  ext: '<svg width="15" height="15" ' + SV + '><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  copy: '<svg width="17" height="17" ' + SV + '><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+  undo: '<svg width="12" height="12" ' + SV + '><path d="M4 9h11a5 5 0 0 1 0 10h-4"/><path d="M8 5L4 9l4 4"/></svg>',
+  left: '<svg width="20" height="20" ' + SV + ' stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>',
+  right: '<svg width="20" height="20" ' + SV + ' stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg>',
+  image: '<svg width="16" height="16" ' + SV + '><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+  grid: '<svg width="15" height="15" ' + SV + '><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  x: '<svg width="16" height="16" ' + SV + ' stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  book: '<svg width="15" height="15" ' + SV + '><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/><path d="M8 7h7"/></svg>',
+  load: '<svg width="15" height="15" ' + SV + '><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>',
+  globe: '<svg width="15" height="15" ' + SV + '><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>'
+};
+function icon(name) { var s = document.createElement('span'); s.className = 'ic'; s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICONS[name]; return s; }
+
+/* ---------- 小道具 ---------- */
+function h(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  if (attrs) for (var k in attrs) {
+    if (k === 'text') e.textContent = attrs[k];
+    else if (k === 'class') e.className = attrs[k];
+    else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  if (kids) for (var i = 0; i < kids.length; i++) if (kids[i]) e.appendChild(typeof kids[i] === 'string' ? document.createTextNode(kids[i]) : kids[i]);
+  return e;
+}
+function $(id) { return document.getElementById(id); }
+function ceil10(n) { return Math.ceil(n / 10) * 10; }
+function copyText(text, done) {
+  var fb = function () {
+    var ta = h('textarea', { style: 'position:fixed;left:-999px;top:0' });
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); done(ok);
+  };
+  if (navigator.clipboard && window.isSecureContext !== false) navigator.clipboard.writeText(text).then(function () { done(true); }, fb);
+  else fb();
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+/* 検索用: ひらがな→カタカナ・小文字化・空白除去 */
+function norm(s) { return String(s || '').toLowerCase().replace(/[ぁ-ゖ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 0x60); }).replace(/[\s　・]/g, ''); }
+function openDlg(d) { try { if (!d.open) d.showModal(); } catch (e) { d.setAttribute('open', ''); } }
+function closeDlg(d) { try { d.close(); } catch (e) { d.removeAttribute('open'); } }
+/* ダイアログの外側 (背景) のクリックで閉じる */
+function backdropClose(d) {
+  d.addEventListener('mousedown', function (e) { d._downOut = e.target === d; });
+  d.addEventListener('click', function (e) {
+    if (e.target !== d || !d._downOut) return;
+    var r = d.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDlg(d);
+  });
+}
+function thumbSrc(id) { return 'thumbs/' + encodeURIComponent(id) + '.png'; }
+
+/* ---------- 状態 ---------- */
+var cfg = CS.parse('');
+var showFrame = true;
+var syncers = [];       // 各コントロールの表示更新関数
+var sizeSyncers = [];   // 推奨サイズの表示更新関数
+var ready = false;      // プレビュー iframe の準備完了
+var measured = null;    // プレビューの時計の実寸 { w, h } (clock.html から届く)
+var measuredQ = '';     // measured を測ったときの設定 (クエリ文字列)
+var trialId = null;     // 試し表示中のデザイン (マウスを乗せている間だけ。設定・URL には入れない)
+var trialMeasured = null;
+var lastSendAt = 0;
+
+function load() {
+  var s = null;
+  try {
+    s = JSON.parse(lsGet(STORE) || 'null');
+    if (typeof s === 'string') cfg = CS.parse(s);   // 念のため: クエリ文字列だけが入っている形
+    else if (s && typeof s === 'object') {
+      if (typeof s.q === 'string') cfg = CS.parse(s.q);
+      if (s.fr === 0) showFrame = false;
+    }
+  } catch (e) {}
+  if (!s && HAS_LANG) { cfg.lang = uiLang; fixClockLang(D.lang); }
+  cfg = tidy(cfg);
+}
+/* 読み込んだ設定の後始末: 開発用の値を消す・無料版は制限を適用・デザイン標準と同じフォントは「標準」扱いにする */
+function tidy(c) {
+  delete c.t; delete c.moon;
+  if (FREE) c = CS.effective(c);
+  var d = CS.design(c.d);
+  if (d && c.font && c.font === d.font) c.font = '';
+  return c;
+}
+function save() {
+  lsSet(STORE, JSON.stringify({ q: CS.serialize(cfg), fr: showFrame ? 1 : 0 }));
+}
+function curDesign() { return CS.design(cfg.d) || CS.DESIGNS[0]; }
+/* URL に入れる設定: 時計側が無視・丸める値 (AM/PM がないデザインの ap、短冊の slash/dot/en) は既定のままにする */
+var TZ_OFF_DF = ['slash', 'dot', 'en'];
+function dfOff() { return cfg.d === 'tanzaku' ? TZ_OFF_DF : []; }
+function forUrl(c) {
+  var e = CS.effective(c), d = CS.design(e.d), s = (d && d.supports) || {};
+  var o = {}; for (var k in e) if (e.hasOwnProperty(k)) o[k] = e[k];
+  if (s.ap === false) o.ap = D.ap;
+  if (o.d === 'tanzaku' && TZ_OFF_DF.indexOf(o.df) >= 0) o.df = D.df;
+  return o;
+}
+function queryNow() { return CS.serialize(forUrl(cfg)); }
+/* 先頭ゼロの既定は 12 時間表示のとき 0。表示は ClockStudio.parse(serialize(cfg)) の実効値から決める */
+function padDef() { return cfg.h12 ? 0 : D.pad; }
+function effPad() { return CS.parse(CS.serialize(cfg)).pad; }
+function effDf() { return dfOff().indexOf(cfg.df) >= 0 ? D.df : cfg.df; }
+function sup(k) { var s = curDesign().supports || {}; return s[k] !== false; }
+function effH12() { return !!cfg.h12 && sup('h12'); }
+function urlNow() {
+  var q = queryNow();
+  var u = new URL('clock.html', location.href);
+  return u.href.split('?')[0].split('#')[0] + (q ? '?' + q : '');
+}
+
+/* ---------- 値の変更 ---------- */
+function set(k, v) { cfg[k] = v; changed(); }
+function setMany(o) { for (var k in o) cfg[k] = o[k]; changed(); }
+function changed() {
+  save();
+  if (msgState === 'ok' && obsMsg) { clearTimeout(ctimer); copyLabel(false); idleMsg(); }   /* コピーしたあとに設定を変えたら、「コピーしました」の案内は古いので消す */
+  if (!trialId) sendConfig(queryNow());
+  layoutPreview();
+  for (var i = 0; i < syncers.length; i++) syncers[i]();
+  for (var j = 0; j < sizeSyncers.length; j++) sizeSyncers[j]();
+}
+var toastTimer = 0;
+/* act: { label, fn } を渡すと、ボタンつきで長めに出す */
+function toast(msg, act) {
+  var t = $('toast');
+  t.textContent = '';
+  t.appendChild(h('span', { class: 'tm', text: msg }));
+  if (act) {
+    var b = h('button', { type: 'button', class: 'tact', text: act.label });
+    b.addEventListener('click', function () { clearTimeout(toastTimer); t.classList.remove('on'); act.fn(); });
+    t.appendChild(b);
+  }
+  t.classList.toggle('act', !!act);
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('on'); }, act ? 10000 : 3800);
+}
+/* デザインの個性は色と書体で決まるので、切り替えたら色 (c1〜c3) とフォントはそのデザインの標準に戻す */
+function selectDesign(id) {
+  if (CS.isLocked(id) || !CS.design(id)) return;
+  endTrial(true);
+  if (cfg.d === id) return;
+  var had = !FREE && !!(cfg.c1 || cfg.c2 || cfg.c3 || cfg.font);
+  cfg.d = id; cfg.c1 = cfg.c2 = cfg.c3 = ''; cfg.font = '';
+  changed();
+  if (had) toast(T('toast_reset_colors'));
+}
+
+/* ---------- テーマ ---------- */
+function syncTheme() {
+  var light = document.documentElement.getAttribute('data-theme') === 'light';
+  var b = $('themeBtn');
+  b.textContent = '';
+  b.appendChild(icon(light ? 'moon' : 'sun'));
+  b.appendChild(h('span', { class: 'lbl', text: T(light ? 'theme_dark' : 'theme_light') }));
+  b.title = T(light ? 'theme_to_dark' : 'theme_to_light');
+  b.setAttribute('aria-label', b.title);
+}
+$('themeBtn').addEventListener('click', function () {
+  var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  lsSet(THEME, next);
+  syncTheme();
+});
+
+/* ---------- プレビュー ---------- */
+var pv = $('pv');
+function sendConfig(q) {
+  if (!ready) return;
+  lastSendAt = Date.now();
+  try { pv.contentWindow.postMessage({ type: 'clock-studio:config', query: q }, '*'); } catch (e) {}
+}
+window.addEventListener('message', function (e) {
+  var m = e.data;
+  if (!m || typeof m !== 'object' || e.source !== pv.contentWindow) return;   // メインのプレビューからのものだけ
+  if (m.type === 'clock-studio:ready') { ready = true; sendConfig(trialId ? trialQuery(trialId) : queryNow()); }
+  else if (m.type === 'clock-studio:size' && m.w > 0 && m.h > 0 && isFinite(m.w) && isFinite(m.h)) {
+    /* clock.html は設定を受けてから 80ms 後に大きさを送る。送ってから 70ms 以内に届いたものは 1 つ前の設定のもの */
+    if (Date.now() - lastSendAt < 70) return;
+    var sz = { w: Math.min(+m.w, 5000), h: Math.min(+m.h, 5000) };
+    if (trialId) { trialMeasured = sz; layoutPreview(); return; }   // 試し表示中は推奨サイズを変えない
+    /* 時計の幅は時刻の数字 (「1」の数) で毎秒少し変わる。設定が同じあいだは大きい方を保つ (数字がちらつかず、枠が小さすぎにならない) */
+    var q = queryNow();
+    if (measured && measuredQ === q) sz = { w: Math.max(sz.w, measured.w), h: Math.max(sz.h, measured.h) };
+    measured = sz; measuredQ = q;
+    layoutPreview();
+    for (var i = 0; i < sizeSyncers.length; i++) sizeSyncers[i]();
+  }
+});
+/* 推奨サイズ: 実寸 + 余白 を 10px 単位に切り上げ。実寸が届かないうちは rec × size% */
+function recFor(d, m) {
+  if (m) return [ceil10(m.w + MARGIN * 2), ceil10(m.h + MARGIN * 2), true];
+  var r = (d && d.rec) || { v: [400, 160], h: [550, 130] };
+  var s = d && d.supports || {};
+  var base = ((cfg.lay === 'h' || cfg.lay === 'hr') && s.lay !== false) ? r.h : r.v;
+  return [Math.round(base[0] * cfg.size / 100), Math.round(base[1] * cfg.size / 100), false];
+}
+function recSize() { return recFor(curDesign(), measured); }
+function layoutPreview() {
+  var sz = trialId ? recFor(CS.design(trialId), trialMeasured) : recSize();
+  var st = $('stage');
+  var w = sz[0], hh = sz[1];
+  var side = st.clientWidth > 520 ? 112 : 84;   // 左右の ◀ ▶ の分をあける
+  var s = Math.min(1, (st.clientWidth - side) / w, (st.clientHeight - 24) / hh);
+  if (!(s > 0)) s = 1;
+  var f = $('pvframe');
+  f.style.width = w + 'px'; f.style.height = hh + 'px';
+  f.style.transform = 'scale(' + s + ') translate(-50%,-50%)';
+  var sc = $('pvScale');
+  if (s < 0.995) { sc.textContent = T('scale_shrunk', { p: Math.round(s * 100) }); sc.classList.add('on'); }
+  else { sc.textContent = ''; sc.classList.remove('on'); }
+}
+/* プレビューのステージ (背景は暗い色で固定) */
+function applyStage() {
+  var st = $('stage');
+  st.classList.add('bg-dark');
+  st.classList.toggle('showframe', showFrame);
+  save();
+}
+
+/* ---------- 試し表示 (カードにマウスを乗せている間だけ、プレビューに別のデザインを出す) ---------- */
+function trialQuery(id) {
+  var c = {};
+  for (var k in cfg) if (cfg.hasOwnProperty(k)) c[k] = cfg[k];
+  c.d = id; c.c1 = c.c2 = c.c3 = ''; c.font = '';   // 色・フォントはそのデザインの既定、ほかは今のまま
+  return CS.serialize(CS.effective(c));
+}
+function startTrial(id) {
+  if (id === cfg.d || CS.isLocked(id) || !CS.design(id)) { endTrial(); return; }
+  if (trialId === id) return;
+  trialId = id; trialMeasured = null;
+  sendConfig(trialQuery(id));
+  var tag = $('trialTag');
+  tag.textContent = '';
+  tag.appendChild(document.createTextNode(T('trial_prefix')));
+  tag.appendChild(h('b', { text: dName(CS.design(id)) }));
+  tag.appendChild(h('small', { text: T('trial_click') }));
+  $('stage').classList.add('trial');
+  syncTrialCards();
+  layoutPreview();
+}
+function endTrial(silent) {
+  if (!trialId) return;
+  trialId = null; trialMeasured = null;
+  measuredQ = '';   // 試し表示のあとは、次に届いた実寸をそのまま使う (大きい方を保つのをやり直す)
+  $('stage').classList.remove('trial');
+  syncTrialCards();
+  if (!silent) { sendConfig(queryNow()); layoutPreview(); }
+}
+var syncTrialCards = function () {};
+function canHover() { return window.matchMedia && matchMedia('(hover: hover) and (min-width: 1000px)').matches; }
+
+/* ---------- お気に入り ---------- */
+var favs = {};
+try { (JSON.parse(lsGet(FAVS) || '[]') || []).forEach(function (id) { if (typeof id === 'string') favs[id] = 1; }); } catch (e) {}
+function saveFavs() { lsSet(FAVS, JSON.stringify(Object.keys(favs))); }
+function toggleFav(it, tell) {
+  if (it.locked) return;
+  if (favs[it.id]) delete favs[it.id]; else favs[it.id] = 1;
+  saveFavs(); syncFavs(); if (F.fav) applyFilter();
+  if (tell) toast(T(favs[it.id] ? 'toast_fav_added' : 'toast_fav_removed', { name: it.name }));
+}
+
+/* ================= ① デザイン ================= */
+var ITEMS = CS.DESIGNS.map(function (d) { return { id: d.id, name: dName(d), group: d.group, d: d, src: d, locked: CS.isLocked(d.id) }; });
+if (FREE && CS.LOCKED_PREVIEW) CS.LOCKED_PREVIEW.forEach(function (l) { if (!CS.design(l.id)) ITEMS.push({ id: l.id, name: dName(l), group: l.group, d: null, src: l, locked: true }); });
+/* 検索キー: どの言語の名前 (デザイン名・系統名) でも当たるように全言語ぶんをつなぐ */
+function searchKey(it) {
+  var ks = [norm(it.id)];
+  LG.LANGS.forEach(function (l) { ks.push(norm(LG.designName(l.id, it.src)), norm(LG.groupName(l.id, it.group))); });
+  return ks.join('|');
+}
+/* 系統の並び: 有料版の並び (LOCKED_PREVIEW の順) を基準にする */
+var GROUPS = [], GMAP = {};
+function addGroup(g) { if (!GMAP[g]) { GMAP[g] = []; GROUPS.push(g); } }
+(CS.LOCKED_PREVIEW || []).forEach(function (l) { addGroup(l.group); });
+ITEMS.forEach(function (it) { addGroup(it.group); GMAP[it.group].push(it); it.key = searchKey(it); it.views = []; });
+GROUPS = GROUPS.filter(function (g) { return GMAP[g].length; });
+var ORDERED = [];   // 画面に並ぶ順
+GROUPS.forEach(function (g) { GMAP[g].forEach(function (it) { ORDERED.push(it); }); });
+var TOTAL = ORDERED.length;
+
+var F = { group: '', fav: false, q: '', onlyFree: false };   // 絞り込み (左の一覧と「大きく並べて選ぶ」で共通)
+var bars = [];    // 絞り込みバー (左と大きく並べて選ぶ) の同期用
+var views = [];   // カードの一覧 (左と大きく並べて選ぶ)
+
+function filtered() { return F.group || F.fav || F.q || F.onlyFree; }
+function navList() { return ORDERED.filter(function (it) { return it.vis && !it.locked; }); }
+
+function buildFilterBar(host, big) {
+  var bar = { big: big };
+  var sIn = h('input', { type: 'search', placeholder: T('search_placeholder'), 'aria-label': T('search_aria') });
+  sIn.addEventListener('input', function () { F.q = norm(sIn.value); bar.qv = sIn.value; syncBars(sIn); applyFilter(); });
+  bar.sIn = sIn;
+  var srow = h('div', { class: 'srow' }, [h('div', { class: 'search' }, [icon('search'), sIn])]);
+  if (!big) {
+    var rnd = h('button', { class: 'btn small rndbtn', type: 'button', title: T('random_title') }, [icon('dice'), h('span', { class: 'lbl', text: T('random') })]);
+    rnd.setAttribute('aria-label', T('random_aria'));
+    rnd.addEventListener('click', randomPick);
+    srow.appendChild(rnd);
+  } else {
+    srow.appendChild(h('button', { class: 'btn', type: 'button', title: T('random_title_big'), onclick: function () { randomPick(); closeDlg($('dlgGal')); } }, [icon('dice'), T('random')]));
+  }
+  if (big) { host.appendChild(sIn.parentNode); host.appendChild(srow.lastChild); } else host.appendChild(srow);
+  var chips = h('div', { class: 'chips', role: 'group', 'aria-label': T('chips_aria') });
+  bar.chips = [];
+  function addChip(val, label, n, pre) {
+    var kids = [pre, label];
+    var sm = null;
+    if (big) { sm = h('small', { text: String(n) }); kids.push(sm); }
+    var b = h('button', { type: 'button', class: 'chip' }, kids);
+    b._v = val; b._n = sm;
+    b.addEventListener('click', function () {
+      if (val === '*fav') { F.fav = !F.fav; if (F.fav) F.group = ''; }
+      else if (val === '') { F.group = ''; F.fav = false; }
+      else { F.group = F.group === val ? '' : val; F.fav = false; }
+      applyFilter();
+    });
+    chips.appendChild(b); bar.chips.push(b);
+    return b;
+  }
+  addChip('', T('chip_all'), TOTAL);
+  bar.favChip = addChip('*fav', T('chip_fav'), 0, icon('star'));
+  GROUPS.forEach(function (g) { addChip(g, gName(g), GMAP[g].length); });
+  chips.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].indexOf(k) < 0) return;
+    var i = bar.chips.indexOf(e.target);
+    if (i < 0) return;
+    e.preventDefault();
+    var n = bar.chips.length;
+    var j = k === 'Home' ? 0 : k === 'End' ? n - 1 : (k === 'ArrowLeft' || k === 'ArrowUp') ? Math.max(0, i - 1) : Math.min(n - 1, i + 1);
+    bar.chips.forEach(function (c) { c.tabIndex = -1; });
+    bar.chips[j].tabIndex = 0;
+    bar.chips[j].focus();
+  });
+  host.appendChild(chips);
+  var meta = h('div', { class: 'dmeta' });
+  bar.count = h('span', { 'aria-live': 'polite' });
+  meta.appendChild(bar.count);
+  bar.clr = h('button', { type: 'button', class: 'link', text: T('clear_filters'), onclick: clearFilters });
+  meta.appendChild(bar.clr);
+  bar.meta = meta;
+  if (FREE) {
+    var cb = h('input', { type: 'checkbox' });
+    cb.addEventListener('change', function () { F.onlyFree = cb.checked; applyFilter(); });
+    bar.cbFree = cb;
+    meta.appendChild(h('label', { class: 'sw-toggle onlyfree' }, [cb, h('span', { text: T('only_free') })]));
+  }
+  host.appendChild(meta);
+  bars.push(bar);
+  return bar;
+}
+function syncBars(src) {
+  bars.forEach(function (b) {
+    if (b.sIn !== src && b.sIn.value !== (src ? src.value : b.sIn.value)) b.sIn.value = src.value;
+  });
+}
+function clearFilters() { F.group = ''; F.fav = false; F.q = ''; bars.forEach(function (b) { b.sIn.value = ''; }); applyFilter(); }
+
+function buildCard(view, it) {
+  var img = h('img', { alt: '', loading: view.big ? 'lazy' : 'eager', decoding: 'async', draggable: 'false' });
+  var thumb = h('span', { class: 'thumb' }, [img, h('span', { class: 'alt', text: it.name })]);
+  var pick = h('button', { type: 'button', class: 'pick' }, [thumb, h('span', { class: 'nm', text: it.name })]);
+  var card = h('div', { class: 'card' + (it.locked ? ' locked' : ''), 'data-id': it.id }, [pick]);
+  img.addEventListener('error', function () { card.classList.add('nothumb'); });
+  img.src = thumbSrc(it.id);
+  var rec = { it: it, card: card, pick: pick };
+  if (it.locked) {
+    thumb.appendChild(h('span', { class: 'lockmark' }, [icon('lock'), h('span', { class: 'lt', text: T('paid_tag') })]));
+    pick.setAttribute('aria-label', T('locked_aria', { name: it.name }));
+    pick.title = T('paid_design');
+    pick.addEventListener('click', function () { showLocked(it); });
+  } else {
+    var sel = h('span', { class: 'sel', 'aria-hidden': 'true' }); sel.appendChild(icon('check'));
+    card.appendChild(sel);
+    var fav = h('button', { type: 'button', class: 'fav', tabindex: '-1' }, [icon('star')]);   /* Tab 順には入れない。キーボードではカードで F キー */
+    fav.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleFav(it);
+    });
+    card.appendChild(fav);
+    rec.fav = fav;
+    pick.addEventListener('click', function () {
+      selectDesign(it.id);
+      if (view.big) { closeDlg($('dlgGal')); revealCard(it.id, true); }
+    });
+  }
+  pick.addEventListener('keydown', function (e) {
+    if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && !it.locked) { e.preventDefault(); toggleFav(it, true); }
+  });
+  if (!view.big) {
+    pick.addEventListener('mouseenter', function () { hoverCard(it); });
+    pick.addEventListener('focus', function () { view.focusId = it.id; });
+  }
+  it.views.push(rec);
+  return rec;
+}
+function buildList(host, big) {
+  var view = { big: big, host: host, groups: [] };
+  GROUPS.forEach(function (g) {
+    var cnt = h('small');
+    var head = h('div', { class: 'ghead' }, [gName(g), cnt]);
+    var grid = h('div', { class: 'dgrid', role: 'group', 'aria-label': gName(g) });
+    var box = h('div', { class: 'dgroup' }, [head, grid]);
+    GMAP[g].forEach(function (it) { grid.appendChild(buildCard(view, it).card); });
+    host.appendChild(box);
+    view.groups.push({ g: g, box: box, cnt: cnt });
+  });
+  var clearBtn = h('button', { class: 'btn small', type: 'button', text: T('clear_filters') });
+  clearBtn.addEventListener('click', clearFilters);
+  view.emptyTx = h('div');
+  view.empty = h('div', { class: 'empty' }, [view.emptyTx, clearBtn]);
+  view.empty.style.display = 'none';
+  host.appendChild(view.empty);
+  views.push(view);
+  return view;
+}
+function applyFilter() {
+  var perG = {}, vis = 0;
+  ORDERED.forEach(function (it) {
+    it.vis = !(F.onlyFree && it.locked) && (!F.group || F.group === it.group) && (!F.fav || favs[it.id]) && (!F.q || it.key.indexOf(F.q) >= 0);
+    if (it.vis) { vis++; perG[it.group] = (perG[it.group] || 0) + 1; }
+    it.views.forEach(function (r) { r.card.style.display = it.vis ? '' : 'none'; });
+  });
+  views.forEach(function (v) {
+    v.groups.forEach(function (gr) { var n = perG[gr.g] || 0; gr.box.style.display = n ? '' : 'none'; gr.cnt.textContent = T('group_count', { n: n }); });
+    v.empty.style.display = vis ? 'none' : '';
+    v.emptyTx.textContent = T(F.fav && !Object.keys(favs).length ? 'empty_fav' : 'empty_none');
+  });
+  bars.forEach(function (b) {
+    b.count.textContent = filtered() ? T('count_filtered', { vis: vis, total: TOTAL }) : T('count_all', { total: TOTAL });
+    b.chips.forEach(function (c) {
+      var on = c._v === '*fav' ? F.fav : (!F.fav && c._v === F.group);
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (b.chips.indexOf(document.activeElement) < 0) c.tabIndex = on ? 0 : -1;   /* Tab で入るのは選択中のチップだけ (矢印キーで移動) */
+    });
+    if (b.cbFree) b.cbFree.checked = F.onlyFree;
+    b.clr.style.display = filtered() && !(F.onlyFree && !F.group && !F.fav && !F.q) ? '' : 'none';
+    b.meta.style.display = filtered() || FREE || b.big ? '' : 'none';
+  });
+  syncNav();
+  syncRoving();
+}
+function syncFavs() {
+  var n = 0;
+  ORDERED.forEach(function (it) {
+    var on = !!favs[it.id]; if (on && !it.locked) n++;
+    it.views.forEach(function (r) {
+      if (!r.fav) return;
+      r.fav.setAttribute('aria-pressed', on ? 'true' : 'false');
+      r.fav.setAttribute('aria-label', T(on ? 'fav_remove_aria' : 'fav_add_aria', { name: it.name }));
+      r.fav.title = T(on ? 'fav_remove' : 'fav_add');
+    });
+  });
+  bars.forEach(function (b) { if (b.favChip._n) b.favChip._n.textContent = String(n); });
+}
+function randomPick() {
+  var pool = ORDERED.filter(function (it) { return !it.locked && it.vis && it.id !== cfg.d; });
+  if (!pool.length) { clearFilters(); pool = ORDERED.filter(function (it) { return !it.locked && it.id !== cfg.d; }); }
+  if (!pool.length) return;
+  var it = pool[Math.floor(Math.random() * pool.length)];
+  selectDesign(it.id);
+  revealCard(it.id, true);
+}
+/* 左の一覧で、そのカードが見えるようにスクロール */
+function revealCard(id, flash) {
+  var r = leftRec(id);
+  if (!r || r.card.style.display === 'none') return;
+  var list = $('dlist'), cr = r.card.getBoundingClientRect(), lr = list.getBoundingClientRect();
+  if (list.scrollHeight > list.clientHeight + 2) {
+    var head = 34;
+    if (cr.top < lr.top + head) list.scrollTop += cr.top - lr.top - head - 6;
+    else if (cr.bottom > lr.bottom) list.scrollTop += cr.bottom - lr.bottom + 8;
+  } else if (window.innerWidth < 1000) {
+    try { r.card.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+  if (flash) { r.card.classList.remove('flash'); void r.card.offsetWidth; r.card.classList.add('flash'); }
+}
+function leftRec(id) {
+  for (var i = 0; i < ORDERED.length; i++) if (ORDERED[i].id === id) return ORDERED[i].views[0];
+  return null;
+}
+/* ◀ ▶: いまの絞り込みの並び順で前後へ (ロック中は飛ばす) */
+function stepDesign(dir) {
+  var list = navList();
+  if (!list.length) return;
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) if (list[i].id === cfg.d) idx = i;
+  var next = idx < 0 ? (dir > 0 ? list[0] : list[list.length - 1]) : list[(idx + dir + list.length) % list.length];
+  selectDesign(next.id);
+  revealCard(next.id);
+}
+function syncNav() {
+  var list = navList(), idx = -1;
+  for (var i = 0; i < list.length; i++) if (list[i].id === cfg.d) idx = i;
+  $('pvName').textContent = dName(curDesign());
+  var label = T('nav_pos', { i: idx >= 0 ? (idx + 1) : '–', n: list.length });
+  if (F.group) label += T('nav_pos_group', { group: gName(F.group) });
+  else if (F.fav) label += T('nav_pos_fav');
+  else if (F.q || F.onlyFree) label += T('nav_pos_filtered');
+  $('pvPos').textContent = label;
+  var dis = list.length === 0 || (list.length === 1 && idx === 0);
+  $('navPrev').disabled = dis; $('navNext').disabled = dis;
+}
+/* キーボード: 一覧の中ではカードからカードへ矢印キーで移動し、そのまま決定 (Tab で入るのは 1 枚だけ) */
+function syncRoving() {
+  var v = views[0]; if (!v) return;
+  var first = null, cur = null;
+  ORDERED.forEach(function (it) {
+    var r = it.views[0];
+    r.pick.tabIndex = -1;
+    if (!it.vis) return;
+    if (!first) first = r;
+    if (it.id === cfg.d) cur = r;
+  });
+  var t = cur || first;
+  if (t) t.pick.tabIndex = 0;
+}
+function onListKey(e) {
+  var k = e.key;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(k) < 0) return;
+  var pick = e.target.closest && e.target.closest('.pick');
+  if (!pick || !$('dlist').contains(pick)) return;
+  var vis = ORDERED.filter(function (it) { return it.vis; }).map(function (it) { return it.views[0]; });
+  var ci = -1;
+  for (var i = 0; i < vis.length; i++) if (vis[i].pick === pick) ci = i;
+  if (ci < 0) return;
+  e.preventDefault();
+  var target = null;
+  if (k === 'ArrowLeft') target = vis[ci - 1];
+  else if (k === 'ArrowRight') target = vis[ci + 1];
+  else if (k === 'Home') target = vis[0];
+  else if (k === 'End') target = vis[vis.length - 1];
+  else {
+    var r0 = vis[ci].card.getBoundingClientRect(), cx = r0.left + r0.width / 2, best = null, bestRow = null;
+    vis.forEach(function (r) {
+      var q = r.card.getBoundingClientRect();
+      var dy = k === 'ArrowDown' ? q.top - r0.top : r0.top - q.top;
+      if (dy < 4) return;
+      if (bestRow === null || dy < bestRow - 2) { bestRow = dy; best = r; }
+      else if (Math.abs(dy - bestRow) <= 2 && Math.abs(q.left + q.width / 2 - cx) < Math.abs(best.card.getBoundingClientRect().left + best.card.getBoundingClientRect().width / 2 - cx)) best = r;
+    });
+    target = best;
+  }
+  if (!target) return;
+  if (!target.it.locked) selectDesign(target.it.id);
+  vis.forEach(function (r) { r.pick.tabIndex = -1; });
+  target.pick.tabIndex = 0;
+  target.pick.focus({ preventScroll: true });
+  revealCard(target.it.id);
+}
+/* マウスを乗せたら 150ms 後に試し表示。一覧から外れたら選択中のデザインに戻す */
+var hoverTimer = 0;
+function hoverCard(it) {
+  clearTimeout(hoverTimer);
+  if (!canHover()) return;
+  if (it.locked) return;   // 有料版のデザインは試し表示しない
+  hoverTimer = setTimeout(function () { startTrial(it.id); }, trialId ? 60 : HOVER_MS);
+}
+
+function buildDesignCol() {
+  var col = $('colDesign');
+  var bigBtn = h('button', { class: 'btn small end', type: 'button', title: T('big_btn_title') }, [icon('grid'), h('span', { class: 'lbl', text: T('big_btn') })]);
+  bigBtn.setAttribute('aria-label', T('big_btn'));
+  bigBtn.addEventListener('click', openGallery);
+  col.appendChild(h('div', { class: 'col-head' }, [h('h2', { id: 'hDesign' }, [h('span', { class: 'num', text: '①' }), T('h_design')]), bigBtn]));
+  var tools = h('div', { class: 'dtools' });
+  buildFilterBar(tools, false);
+  col.appendChild(tools);
+  var list = h('div', { class: 'dlist', id: 'dlist' });
+  buildList(list, false);
+  col.appendChild(list);
+  list.addEventListener('keydown', onListKey);
+  list.addEventListener('mouseleave', function () { clearTimeout(hoverTimer); endTrial(); });
+  syncTrialCards = function () {
+    ORDERED.forEach(function (it) { var r = it.views[0]; if (r) r.card.classList.toggle('trial', trialId === it.id); });
+  };
+  syncers.push(function () {
+    ORDERED.forEach(function (it) {
+      var on = !it.locked && cfg.d === it.id;
+      it.views.forEach(function (r) {
+        r.card.classList.toggle('on', on);
+        if (!it.locked) r.pick.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    });
+    syncNav();
+    syncRoving();
+  });
+}
+function buildGallery() {
+  var head = $('galHead');
+  buildFilterBar(head, true);
+  buildList($('galBody'), true);
+  $('galX').appendChild(icon('x'));
+  $('galX').addEventListener('click', function () { closeDlg($('dlgGal')); });
+  backdropClose($('dlgGal'));
+}
+function openGallery() {
+  endTrial();
+  openDlg($('dlgGal'));
+  var it = null;
+  for (var i = 0; i < ORDERED.length; i++) if (ORDERED[i].id === cfg.d) it = ORDERED[i];
+  var r = it && it.views[1];
+  if (r && it.vis) {
+    try { r.card.scrollIntoView({ block: 'center' }); } catch (e) {}
+    r.pick.focus({ preventScroll: true });
+  }
+}
+
+function showLocked(it) {
+  var free = CS.DESIGNS.filter(function (d) { return d.free; }).map(dName);
+  $('paidTitle').textContent = T('paid_dialog_title', { name: it.name });
+  $('paidBody').textContent = T('paid_dialog_body', { list: free.join(T('list_sep')), n: free.length, total: TOTAL });
+  $('paidGo').href = CS.PAID_URL;
+  var box = $('paidImgBox'), img = $('paidImg');
+  box.style.display = '';
+  img.onerror = function () { box.style.display = 'none'; };
+  img.src = thumbSrc(it.id);
+  openDlg($('dlgPaid'));
+}
+
+/* ================= ② 好みに調整 ================= */
+/* タイムゾーン: IANA 名だけを持ち、表示名は辞書 (tz_…) から */
+var TZ = ['', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Taipei', 'Asia/Hong_Kong', 'Asia/Singapore', 'Asia/Bangkok', 'Asia/Kolkata',
+  'Asia/Dubai', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow', 'America/New_York', 'America/Chicago', 'America/Denver',
+  'America/Los_Angeles', 'America/Sao_Paulo', 'Pacific/Honolulu', 'Australia/Sydney', 'Pacific/Auckland', 'UTC'].map(function (z) { return [z, T(LG.tzKey(z))]; });
+var QUICK_FONTS = ['rounded', 'noto', 'dela', 'orbitron', 'mincho', 'dot', 'bebas'];
+var OFF_SUP = T('off_sup');
+var MORE_SUP = [];   // くわしい設定の中で「このデザインでは変えられない」ことがある項目 (先頭の 1 行にまとめて出す)
+var OFF_PAID = T('off_paid');
+
+var fontsLoaded = false;
+/* フォント見本: 数字とコロンだけの小さなサブセットを 1 回だけまとめて読む (オフラインなら代わりのフォントのまま) */
+function loadSampleFonts() {
+  if (fontsLoaded) return; fontsLoaded = true;
+  var fam = CS.FONTS.filter(function (f) { return f.google; }).map(function (f) { return 'family=' + f.google; }).join('&');
+  if (!fam) return;
+  var l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?' + fam + '&text=' + encodeURIComponent('0123456789:') + '&display=swap';
+  l.onerror = function () {};
+  document.head.appendChild(l);
+}
+
+/* 1 項目: 見出し (変えたら点 + 元に戻す) + 操作部品 + 使えない理由
+ * o: { label, hint, keys, sup, supText, inMore, paid, show, quietPaid, onReset, isChanged }
+ *    inMore: くわしい設定の項目。「このデザインでは変えられません」は先頭のまとめに出し、項目は薄くするだけ */
+function item(host, o, ctl, ctlSync) {
+  var lab = h('span', { text: o.label || '' });
+  var hd = h('div', { class: 'it-h' }, [lab, h('span', { class: 'cdot', 'aria-hidden': 'true' })]);
+  if (o.hint) hd.appendChild(h('span', { class: 'hint2', text: o.hint }));
+  var rs = h('button', { type: 'button', class: 'rs', title: T('reset_item_title') }, [icon('undo'), T('reset_item')]);
+  rs.addEventListener('click', function () {
+    if (o.onReset) { o.onReset(); return; }
+    var p = {}; (o.keys || []).forEach(function (k) { p[k] = o.def ? o.def(k) : D[k]; }); setMany(p);
+  });
+  hd.appendChild(rs);
+  var offTx = h('span');
+  var offIc = icon('lock');
+  var off = h('div', { class: 'it-off' }, [offIc, offTx]);
+  var c = h('div', { class: 'it-c' }, [ctl]);
+  var el = h('div', { class: 'it' }, [hd, c, off]);
+  el._lab = lab;
+  if (o.inMore && o.sup) MORE_SUP.push(o);
+  syncers.push(function () {
+    var show = o.show ? !!o.show() : true;
+    el.hidden = !show;
+    if (!show) return;
+    var why = '', paidOff = false, supOff = false;
+    if (o.sup && !sup(o.sup)) { why = o.supText || OFF_SUP; supOff = true; }
+    else if (o.paid && FREE) { why = OFF_PAID; paidOff = true; }
+    el.classList.toggle('off', !!why);
+    offTx.textContent = why;
+    offIc.style.display = paidOff ? '' : 'none';
+    off.style.display = ((paidOff && o.quietPaid) || (supOff && o.inMore)) ? 'none' : '';
+    var els = c.querySelectorAll('input,select,button,textarea');
+    for (var i = 0; i < els.length; i++) els[i].disabled = !!why;
+    var ch = !why && (o.isChanged ? o.isChanged() : (o.keys || []).some(function (k) { return String(o.shown ? o.shown(k) : cfg[k]) !== String(o.def ? o.def(k) : D[k]); }));
+    el.classList.toggle('changed', ch);
+    rs.setAttribute('aria-label', T('reset_item_aria', { label: o.label || '' }));
+    if (ctlSync) ctlSync(!!why);
+  });
+  host.appendChild(el);
+  return el;
+}
+function segCtl(key, options, cls, label, onPick) {
+  var wrap = h('div', { class: cls || 'seg', role: 'group', 'aria-label': label || '' });
+  var sig = null;
+  function build() {
+    var opts = typeof options === 'function' ? options() : options;
+    var sg = JSON.stringify(opts);
+    if (sg === sig) return;
+    sig = sg; wrap.textContent = '';
+    wrap._btns = opts.map(function (o) {
+      var b = h('button', { type: 'button', text: o[1], onclick: function () { var v = typeof D[key] === 'number' ? +o[0] : o[0]; if (onPick) onPick(v); else set(key, v); } });
+      b.setAttribute('data-v', o[0]);
+      if (o[2]) b.title = o[2];
+      wrap.appendChild(b); return b;
+    });
+  }
+  build();
+  wrap._sync = function (whole) {
+    build();
+    var cur = wrap._shown ? wrap._shown(key) : cfg[key];
+    wrap._btns.forEach(function (b) { b.setAttribute('aria-pressed', String(cur) === b.getAttribute('data-v') ? 'true' : 'false'); if (whole) b.disabled = true; });
+  };
+  return wrap;
+}
+function addSeg(host, o, key, options, cls) {
+  o.keys = o.keys || [key];
+  var c = segCtl(key, options, cls, o.label, o.onPick);
+  c._shown = o.shown;
+  var ctl = c, sync = c._sync;
+  if (o.offVals) {   /* 一部の選択肢だけ使えない (薄く表示 + 注記) */
+    var note = h('div', { class: 'partnote' });
+    ctl = h('div', null, [c, note]);
+    sync = function (whole) {
+      c._sync(whole);
+      var offs = o.offVals();
+      c._btns.forEach(function (b) { if (offs.indexOf(b.getAttribute('data-v')) >= 0) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); } });
+      note.hidden = whole || !offs.length;
+      note.textContent = (whole || !offs.length) ? '' : (o.offNote || '');
+    };
+  }
+  return item(host, o, ctl, sync);
+}
+function addSwitch(host, o, key, text) {
+  o.keys = o.keys || [key];
+  var cb = h('input', { type: 'checkbox' });
+  cb.addEventListener('change', function () { set(key, cb.checked ? 1 : 0); });
+  var lab = h('label', { class: 'sw-toggle' }, [cb, h('span', { text: text })]);
+  return item(host, o, lab, function () { cb.checked = !!cfg[key]; });
+}
+var HEXRE = /^#?([0-9a-fA-F]{6})$/;
+function hexInput(getCur, onSet, label) {
+  var t = h('input', { type: 'text', class: 'hexin', maxlength: '7', spellcheck: 'false', autocomplete: 'off', 'aria-label': T('hex_aria', { label: label }) });
+  function commit() {
+    var m = HEXRE.exec(t.value.trim());
+    if (m) { t.removeAttribute('aria-invalid'); onSet(m[1].toLowerCase()); }
+    else { t.setAttribute('aria-invalid', 'true'); }
+  }
+  t.addEventListener('change', commit);
+  t.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { t.value = '#' + getCur(); t.removeAttribute('aria-invalid'); } });
+  t.addEventListener('blur', function () { t.value = '#' + getCur(); t.removeAttribute('aria-invalid'); });
+  t._sync = function () { if (document.activeElement !== t) t.value = '#' + getCur(); };
+  return t;
+}
+function addRange(host, o, key, min, max, unit, quick) {
+  o.keys = o.keys || [key];
+  var r = h('input', { type: 'range', min: min, max: max, step: 1, 'aria-label': o.label });
+  var n = h('input', { type: 'number', min: min, max: max, step: 1, 'aria-label': T('number_aria', { label: o.label }) });
+  r.addEventListener('input', function () { set(key, +r.value); });
+  n.addEventListener('change', function () {
+    var v = parseInt(n.value, 10); if (isNaN(v)) v = D[key];
+    set(key, Math.max(min, Math.min(max, v)));
+  });
+  var wrap = h('div', { style: 'width:100%' }, [h('div', { class: 'rangebox' }, [r, n, h('span', { class: 'unit', text: unit })])]);
+  var qb = [];
+  if (quick) {
+    var q = h('div', { class: 'quick', role: 'group', 'aria-label': T('quick_aria', { label: o.label }) });
+    quick.forEach(function (v) { var b = h('button', { type: 'button', class: 'pbtn', text: v + unit, onclick: function () { set(key, v); } }); b._v = v; q.appendChild(b); qb.push(b); });
+    wrap.appendChild(q);
+  }
+  return item(host, o, wrap, function () {
+    r.value = cfg[key]; if (document.activeElement !== n) n.value = cfg[key];
+    qb.forEach(function (b) { b.setAttribute('aria-pressed', cfg[key] === b._v ? 'true' : 'false'); });
+  });
+}
+function sec(host, title, sub) {
+  var s = h('section', { class: 'sec' });
+  var hd = h('h3', { class: 'sec-h' }, [title]);
+  if (sub) hd.appendChild(h('span', { class: 'sub', text: sub }));
+  s.appendChild(hd);
+  host.appendChild(s);
+  return s;
+}
+function lockNote(host) {
+  if (!FREE) return;
+  host.appendChild(h('div', { class: 'locknote' }, [icon('lock'), h('span', { text: T('lock_note') }), h('a', { href: CS.PAID_URL, target: '_blank', rel: 'noopener', text: T('see_paid') })]));
+}
+
+function buildAdjustCol() {
+  var col = $('colAdjust');
+  col.appendChild(h('div', { class: 'col-head' }, [h('h2', { id: 'hAdjust' }, [h('span', { class: 'num', text: '②' }), T('h_adjust')]), h('span', { class: 'sub end', text: T('autosave') })]));
+  var adj = h('div', { class: 'adj', id: 'adj' });
+  col.appendChild(adj);
+
+  /* --- 表示 --- */
+  var s = sec(adj, T('sec_display'));
+  var TG = [['sec', T('tg_sec'), T('tg_sec_title')], ['date', T('tg_date'), T('tg_date_title')], ['h12', T('tg_h12'), T('tg_h12_title')]];
+  var tgrid = h('div', { class: 'tgrid', role: 'group', 'aria-label': T('tg_aria') });
+  var tnote = h('div', { class: 'tnote' });
+  var tgs = TG.map(function (t) {
+    var b = h('button', { type: 'button', class: 'tg', title: t[2] }, [h('span', { class: 'tsw', 'aria-hidden': 'true' }), h('span', { class: 'tl', text: t[1] }), h('span', { class: 'cdot', 'aria-hidden': 'true' })]);
+    b.addEventListener('click', function () {
+      if (t[0] !== 'h12') { set(t[0], cfg[t[0]] ? 0 : 1); return; }
+      var wasDef = cfg.pad === padDef();   /* 先頭ゼロを自分で選んでいなければ、新しい既定に表示を追従させる */
+      cfg.h12 = cfg.h12 ? 0 : 1;
+      if (wasDef) cfg.pad = padDef();
+      changed();
+    });
+    b._k = t[0]; b._n = t[1];
+    tgrid.appendChild(b); return b;
+  });
+  s.appendChild(tgrid);
+  s.appendChild(tnote);
+  syncers.push(function () {
+    tgs.forEach(function (b) {
+      var k = b._k, off = k === 'h12' && !sup('h12');
+      var on = off ? false : !!cfg[k];
+      b.disabled = off;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.classList.toggle('changed', !off && cfg[k] !== D[k]);
+    });
+    tnote.textContent = sup('h12') ? '' : T('tnote_h12_off', { reason: OFF_SUP });
+  });
+  /* 時計の言葉 (clock-data.js の DEFAULTS に lang があるときだけ出す) */
+  if (HAS_LANG) {
+    var pickClockLang = function (v) { var old = clockLang(); cfg.lang = v; fixClockLang(old); changed(); };
+    addSeg(s, { label: T('clock_lang_label'), hint: T('clock_lang_hint'), def: function () { return uiLang; }, onPick: pickClockLang, onReset: function () { pickClockLang(uiLang); } }, 'lang',
+      LG.LANGS.map(function (l) { return [l.id, l.name]; })).style.marginTop = '12px';
+  }
+  /* オンにした項目のくわしい選択 (オンのときだけ出す) */
+  var subs = h('div', { class: 'subs' });
+  s.appendChild(subs);
+  /* 日付の書き方: 選択肢と表示例は時計の言語から作る (lang が無い間は ja) */
+  addSeg(subs, { label: T('df_label'), hint: T('df_hint'), show: function () { return !!cfg.date; }, offVals: dfOff, offNote: T('df_tanzaku_off'), shown: effDf,
+    def: function () { var d = LG.C(clockLang()).dfDefault; return dfOff().indexOf(d) >= 0 ? D.df : d; } }, 'df',   /* 短冊で使えない既定 (en) のときは時計が描く jp を既定とみなす */
+    function () { var cl = clockLang(); return LG.C(cl).dfList.map(function (id) { return [id, LG.dateExample(cl, id)]; }); }, 'opts');
+  addSeg(subs, { label: T('lay_label'), hint: T('lay_hint'), sup: 'lay', show: function () { return !!cfg.date; } }, 'lay',
+    [['v', T('lay_v')], ['vr', T('lay_vr')], ['h', T('lay_h')], ['hr', T('lay_hr')]]);
+  /* AM/PM: 「午前 / 午後」の語は時計の言語で (zh-TW なら 上午 / 下午)。en には出さない */
+  addSeg(subs, { label: T('ap_label'), sup: 'ap', show: effH12 }, 'ap',
+    function () { var cl = clockLang(); return LG.C(cl).apOptions.map(function (id) { return [id, id === 'jp' ? LG.t(cl, 'ap_jp') : T('ap_' + id)]; }); });
+  syncers.push(function () { subs.classList.toggle('none', !cfg.date && !effH12()); });
+  var lab = h('input', { type: 'text', class: 'labelin', maxlength: '30', placeholder: T('label_placeholder'), 'aria-label': T('label_label') });
+  var cnt = h('span', { class: 'cnt' });
+  lab.addEventListener('input', function () { cfg.label = lab.value; cnt.textContent = T('label_count', { n: Array.from(lab.value).length }); changed(); });
+  lab.addEventListener('blur', function () { if (lab.value !== cfg.label) { cfg.label = CS.parse('label=' + encodeURIComponent(lab.value)).label; changed(); } });
+  var labIt = item(s, { label: T('label_label'), hint: T('label_hint'), keys: ['label'] }, h('div', { class: 'rangebox' }, [lab, cnt]), function () {
+    if (document.activeElement !== lab) lab.value = cfg.label;
+    cnt.textContent = T('label_count', { n: Array.from(lab.value).length });
+  });
+  labIt.style.marginTop = '12px';
+
+  /* --- 色 --- */
+  s = sec(adj, T('sec_color'), FREE ? '' : T('sec_color_sub'));
+  lockNote(s);
+  var palBox = h('div', { class: 'pals', role: 'group', 'aria-label': T('pal_label') });
+  var palDesign = null, palBtns = [];
+  function palColor(d, cols, i) {
+    var v = cols ? cols[i] : null;
+    var m = HEXRE.exec(v == null ? '' : String(v));
+    return m ? m[1].toLowerCase() : d.colors[i];
+  }
+  function palMatches(d, cols) {
+    for (var i = 0; i < 3; i++) {
+      if (d.colors[i] == null) continue;
+      if ((cfg['c' + (i + 1)] || d.colors[i]) !== palColor(d, cols, i)) return false;
+    }
+    return true;
+  }
+  function buildPals(d) {
+    palDesign = d; palBox.textContent = ''; palBtns = [];
+    var list = [{ name: T('pal_original'), colors: null }];
+    if (d && Array.isArray(d.palettes)) d.palettes.forEach(function (pl) { if (pl && Array.isArray(pl.colors)) list.push({ name: pl.name ? LG.paletteName(uiLang, d.id, String(pl.name)) : T('pal_fallback_name'), colors: pl.colors }); });
+    list.forEach(function (pl) {
+      var dots = h('span', { class: 'dots', 'aria-hidden': 'true' });
+      for (var i = 0; i < 3; i++) {
+        if (d.colors[i] == null) continue;
+        var sp = h('span'); sp.style.background = '#' + palColor(d, pl.colors, i); dots.appendChild(sp);
+      }
+      var b = h('button', { type: 'button', class: 'pal', title: pl.colors ? T('pal_title', { name: pl.name }) : T('pal_original_title') }, [dots, h('span', { class: 'pn', text: pl.name })]);
+      b.addEventListener('click', function () {
+        for (var i = 0; i < 3; i++) {
+          var k = 'c' + (i + 1);
+          if (d.colors[i] == null) { cfg[k] = ''; continue; }
+          var v = palColor(d, pl.colors, i);
+          cfg[k] = v === d.colors[i] ? '' : v;
+        }
+        changed();
+      });
+      b._cols = pl.colors;
+      palBox.appendChild(b); palBtns.push(b);
+    });
+  }
+  item(s, { label: T('pal_label'), keys: ['c1', 'c2', 'c3'], paid: true, quietPaid: true }, palBox, function (off) {
+    var d = curDesign();
+    if (d !== palDesign) buildPals(d);
+    palBtns.forEach(function (b) { b.disabled = off; b.setAttribute('aria-pressed', palMatches(d, b._cols) ? 'true' : 'false'); });
+  });
+  var fold = h('details', { class: 'fold' });
+  var foldSum = h('summary', null, [h('span', { class: 'chev', 'aria-hidden': 'true' }), T('fold_colors')]);
+  fold.appendChild(foldSum);
+  var foldIn = h('div', { class: 'fold-in' });
+  fold.appendChild(foldIn);
+  s.appendChild(fold);
+  for (var ci = 0; ci < 3; ci++) (function (idx) {
+    var key = 'c' + (idx + 1);
+    var inp = h('input', { type: 'color', 'aria-label': T('color_generic') });
+    var hx = hexInput(function () { return cfg[key] || curDesign().colors[idx] || '000000'; }, function (v) { set(key, v === curDesign().colors[idx] ? '' : v); }, T('color_generic'));
+    inp.addEventListener('input', function () { set(key, inp.value.replace('#', '').toLowerCase()); });
+    var it = item(foldIn, { label: T('color_generic'), keys: [key], paid: true, quietPaid: true, show: function () { return curDesign().colors[idx] != null; } }, h('div', { class: 'rangebox' }, [inp, hx]), function () {
+      var d = curDesign();
+      var nm = (d.colorLabels && d.colorLabels[idx]) ? LG.colorLabel(uiLang, d.colorLabels[idx]) : T('color_n', { n: idx + 1 });
+      it._lab.textContent = nm;
+      inp.setAttribute('aria-label', nm); hx.setAttribute('aria-label', T('hex_aria', { label: nm }));
+      inp.value = '#' + (cfg[key] || d.colors[idx] || '000000'); hx._sync();
+    });
+  })(ci);
+  foldIn.appendChild(h('div', { class: 'tnote', text: T('color_note') }));
+
+  /* --- フォント --- */
+  s = sec(adj, T('sec_font'), T('sec_font_sub'));
+  lockNote(s);
+  loadSampleFonts();
+  var fGrid = h('div', { class: 'fonts', role: 'group', 'aria-label': T('sec_font') });
+  var fBtns = [], fExpanded = false;
+  function fontBtn(id, name, css) {
+    var smp = h('span', { class: 'smp', text: '12:34' });
+    var fn = h('span', { class: 'fn', text: name });
+    var b = h('button', { type: 'button', class: 'fbtn' + (id ? '' : ' def'), title: name }, [smp, fn]);
+    if (css) smp.style.fontFamily = css;
+    b._id = id; b._smp = smp; b._fn = fn;
+    b.addEventListener('click', function () { set('font', id && id === curDesign().font ? '' : id); });   /* デザイン標準と同じなら「標準」(URL に font を入れない) */
+    fGrid.appendChild(b); fBtns.push(b);
+    return b;
+  }
+  var defBtn = fontBtn('', T('font_default'), '');
+  CS.FONTS.forEach(function (f) { fontBtn(f.id, f.name, f.css); });
+  var more = h('button', { type: 'button', class: 'btn small ghost fmore' });
+  more.addEventListener('click', function () { fExpanded = !fExpanded; changed(); });
+  fGrid.appendChild(more);
+  item(s, { label: '', keys: ['font'], sup: 'font', supText: T('font_own_title'), paid: true, quietPaid: true }, fGrid, function (off) {
+    var d = curDesign(), dFont = CS.font(d.font), own = !sup('font');
+    defBtn._smp.style.fontFamily = dFont ? dFont.css : '';
+    defBtn._fn.textContent = T(own ? 'font_own' : 'font_std');   /* 「(フォント名)」はまとめて次の行へ送れるように別の span にする (文字は「標準 (名前)」のまま) */
+    if (dFont && !own) { defBtn._fn.appendChild(document.createTextNode(' ')); defBtn._fn.appendChild(h('span', { class: 'fnp', text: '(' + dFont.name + ')' })); }
+    defBtn.title = own ? T('font_own_title') : T('font_default_title') + (dFont ? ' (' + dFont.name + ')' : '');
+    var quick = QUICK_FONTS.filter(function (id) { return id !== d.font; }).slice(0, 5);
+    var hiddenN = 0, curF = cfg.font === d.font ? '' : cfg.font;
+    fBtns.forEach(function (b) {
+      if (b._id && (b._id === d.font || own)) { b.hidden = true; b.setAttribute('aria-pressed', 'false'); return; }   /* 標準と同じフォントは一覧に出さない (「標準」で選べる)。専用フォントのデザインではほかを並べない */
+      var shown = !b._id || fExpanded || quick.indexOf(b._id) >= 0 || curF === b._id;
+      b.hidden = !shown; if (!shown) hiddenN++;
+      b.setAttribute('aria-pressed', curF === b._id ? 'true' : 'false');
+    });
+    more.textContent = fExpanded ? T('fonts_collapse') : T('fonts_more', { n: hiddenN });
+    more.disabled = false;
+    more.style.display = (fExpanded || hiddenN) && !off && !own ? '' : 'none';
+  }).classList.add('nolabel');
+  s.appendChild(h('div', { class: 'tnote', text: T('font_note') }));
+
+  /* --- 大きさ --- */
+  s = sec(adj, T('sec_size'));
+  addRange(s, { label: T('size_label'), hint: T('size_hint') }, 'size', 30, 400, '%', [75, 100, 150, 200]);
+
+  /* --- くわしい設定 (畳んである。開閉は記憶する) --- */
+  var md = h('details', { class: 'more' });
+  if (lsGet(K_MORE) === '1') md.open = true;
+  md.addEventListener('toggle', function () { lsSet(K_MORE, md.open ? '1' : '0'); });
+  var mSub = h('span', { class: 'sub' });
+  md.appendChild(h('summary', null, [h('span', { class: 'chev', 'aria-hidden': 'true' }), T('more_title'), h('span', { class: 'cdot', 'aria-hidden': 'true' }), mSub]));
+  var mi = h('div', { class: 'more-in' });
+  md.appendChild(mi);
+  adj.appendChild(md);
+  var MORE_KEYS = ['ol', 'olc', 'sh', 'anim', 'blink', 'pad', 'ax', 'ay', 'tz'];
+  syncers.push(function () {
+    var e = CS.effective(cfg);
+    var n = 0;
+    [['ol'], ['sh'], ['anim'], ['blink'], ['pad'], ['ax', 'ay'], ['tz']].forEach(function (ks) { if (ks.some(function (k) { return !(k === 'pad' && !sup('pad')) && String(e[k]) !== String(k === 'pad' ? padDef() : D[k]); })) n++; });
+    md.classList.toggle('changed', n > 0);
+    mSub.textContent = n ? T('more_changed', { n: n }) : T('more_sub');
+  });
+  if (FREE) mi.appendChild(h('div', { class: 'locknote', style: 'margin-top:4px' }, [icon('lock'), h('span', { text: T('more_locknote') }), h('a', { href: CS.PAID_URL, target: '_blank', rel: 'noopener', text: T('see_paid') })]));
+  var supNote = h('div', { class: 'supnote' });
+  mi.appendChild(supNote);
+  syncers.push(function () {
+    var names = MORE_SUP.filter(function (o) { return !sup(o.sup); }).map(function (o) { return o.label; });
+    supNote.hidden = !names.length;
+    supNote.textContent = names.length ? T('sup_note', { names: names.join(T('list_sep')) }) : '';
+  });
+  addRange(mi, { label: T('ol_label'), hint: T('ol_hint'), sup: 'ol', inMore: true, paid: true, keys: ['ol'] }, 'ol', 0, 8, 'px', [0, 2, 4, 6]);
+  var olc = h('input', { type: 'color', 'aria-label': T('olc_label') });
+  var olHex = hexInput(function () { return cfg.olc; }, function (v) { set('olc', v); }, T('olc_label'));
+  olc.addEventListener('input', function () { set('olc', olc.value.replace('#', '').toLowerCase()); });
+  var olQuick = h('div', { class: 'opts' });
+  [['000000', T('olc_black')], ['ffffff', T('olc_white')]].forEach(function (c) { olQuick.appendChild(h('button', { type: 'button', text: c[1], onclick: function () { set('olc', c[0]); } })); });
+  item(mi, { label: T('olc_label'), hint: T('olc_hint'), keys: ['olc'], sup: 'ol', paid: true, show: function () { return !!cfg.ol && sup('ol'); } }, h('div', { class: 'rangebox' }, [olc, olHex, olQuick]), function () { olc.value = '#' + cfg.olc; olHex._sync(); });
+  addSwitch(mi, { label: T('sh_label'), hint: T('sh_hint') }, 'sh', T('sh_switch'));
+  addSeg(mi, { label: T('anim_label'), hint: T('anim_hint'), sup: 'anim', inMore: true, paid: true }, 'anim', [['none', T('anim_none')], ['fade', T('anim_fade')], ['slide', T('anim_slide')], ['pop', T('anim_pop')]]);
+  addSwitch(mi, { label: T('blink_label'), hint: T('blink_hint'), sup: 'blink', inMore: true }, 'blink', T('blink_switch'));
+  addSeg(mi, { label: T('pad_label'), hint: T('pad_hint'), sup: 'pad', inMore: true, def: padDef, shown: effPad }, 'pad', [['1', '09:05'], ['0', '9:05']]);
+  var pos = h('div', { class: 'obsframe', role: 'group', 'aria-label': T('pos_aria') }), pbn = [];
+  ['t', 'm', 'b'].forEach(function (ay) { ['l', 'c', 'r'].forEach(function (ax) {
+    var nm = T('pos_' + ay + ax);   /* pos_tl … pos_br */
+    var b = h('button', { type: 'button', class: ax + ' ' + ay, title: nm, 'aria-label': nm }, [h('span')]);
+    b.addEventListener('click', function () { setMany({ ax: ax, ay: ay }); });
+    b._a = [ax, ay]; b._n = nm; pos.appendChild(b); pbn.push(b);
+  }); });
+  var posNow = h('b');
+  item(mi, { label: T('pos_label'), hint: T('pos_hint'), keys: ['ax', 'ay'] }, h('div', { class: 'posbox' }, [pos, h('div', { class: 'posinfo' }, [posNow, T('pos_info')])]), function () {
+    pbn.forEach(function (b) { var on = b._a[0] === cfg.ax && b._a[1] === cfg.ay; b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (on) posNow.textContent = T('pos_now', { name: b._n }); });
+  });
+  var tzSel = h('select', { class: 'tzsel', 'aria-label': T('tz_label') });
+  TZ.forEach(function (o) { tzSel.appendChild(h('option', { value: o[0], text: o[1] })); });
+  tzSel.addEventListener('change', function () { set('tz', tzSel.value); });
+  item(mi, { label: T('tz_label'), hint: T('tz_hint'), keys: ['tz'] }, tzSel, function () {
+    if (cfg.tz && !TZ.some(function (o) { return o[0] === cfg.tz; }) && !tzSel.querySelector('option[value="' + cfg.tz.replace(/"/g, '') + '"]')) {
+      tzSel.appendChild(h('option', { value: cfg.tz, text: cfg.tz }));
+    }
+    tzSel.value = cfg.tz;
+  });
+
+  /* --- すべて最初の状態に戻す --- */
+  var rb = h('button', { class: 'btn small', type: 'button' }, [icon('undo'), T('reset_all')]);
+  rb.addEventListener('click', function () { openDlg($('dlgReset')); });
+  adj.appendChild(h('div', { class: 'resetall' }, [rb, h('span', { class: 'note', text: T('reset_all_note') })]));
+  void MORE_KEYS;
+}
+
+/* ================= ③ OBS に入れる ================= */
+var copyBtn, urlBox, openBtn, obsMsg;
+function buildObsBar() {
+  var bar = $('obsbar');
+  var howBtn = h('button', { type: 'button', class: 'link' }, [icon('book'), h('span', { text: T('howto_link') })]);
+  howBtn.addEventListener('click', openHowto);
+  var impBtn = h('button', { type: 'button', class: 'link', id: 'impBtn', title: T('import_link_title') }, [icon('load'), h('span', { class: 'lt', text: T('import_link') }), h('span', { class: 'lt-s', text: T('import_link_short') }), h('span', { class: 'vh', text: T('import_link_vh') })]);
+  impBtn.addEventListener('click', openImport);
+  bar.appendChild(h('div', { class: 'obs-h' }, [h('h2', { id: 'hObs' }, [h('span', { class: 'num', text: '③' }), T('h_obs')]), h('div', { class: 'links' }, [howBtn, impBtn])]));
+  copyBtn = h('button', { class: 'btn primary copybtn', type: 'button', id: 'copyBtn' });
+  copyLabel(false);
+  copyBtn.addEventListener('click', doCopy);
+  var bw = h('button', { type: 'button', id: 'sizeW', title: T('copy_w_title') }), bh = h('button', { type: 'button', id: 'sizeH', title: T('copy_h_title') });
+  bw.addEventListener('click', function () { flashCopy(bw, recSize()[0]); });
+  bh.addEventListener('click', function () { flashCopy(bh, recSize()[1]); });
+  var sizebox = h('div', { class: 'sizebox', id: 'sizebox', title: T('sizebox_title') }, [h('span', { class: 'lbl2', text: T('width') }), bw, h('span', { class: 'x', text: '×' }), h('span', { class: 'lbl2', text: T('height') }), bh]);
+  urlBox = h('input', { type: 'text', class: 'urltext', readonly: '', 'aria-label': T('url_aria'), title: T('url_title') });
+  urlBox.addEventListener('focus', function () { urlBox.select(); });
+  urlBox.addEventListener('mouseup', function (e) { e.preventDefault(); urlBox.select(); });
+  openBtn = h('a', { class: 'btn icon openbtn', target: '_blank', rel: 'noopener', title: T('open_url'), 'aria-label': T('open_url') }, [icon('ext')]);
+  bar.appendChild(h('div', { class: 'obs-row' }, [copyBtn, sizebox, urlBox, openBtn]));
+  obsMsg = h('div', { class: 'obs-msg', role: 'status' });
+  bar.appendChild(obsMsg);
+  if (FREE) buildCredit(bar);
+  syncers.push(function () { var u = urlNow(); urlBox.value = u; openBtn.href = u; });
+  sizeSyncers.push(function () {
+    var r = recSize();
+    bw.textContent = r[0]; bh.textContent = r[1];
+    bw.setAttribute('aria-label', T('copy_w_aria', { n: r[0] })); bh.setAttribute('aria-label', T('copy_h_aria', { n: r[1] }));
+    sizebox.classList.toggle('over', isOver(r));
+    if (msgState === 'idle') idleMsg();
+  });
+  idleMsg();
+}
+/* おすすめサイズが配信画面 (1920×1080) より大きい */
+function isOver(r) { return r[0] > 1920 || r[1] > 1080; }
+var OVER_MSG = T('over_msg');
+var msgState = 'idle';
+function idleMsg() {
+  msgState = 'idle';
+  var over = isOver(recSize());
+  obsMsg.className = 'obs-msg ' + (over ? 'warn' : 'idle');
+  obsMsg.textContent = over ? OVER_MSG : T('obs_idle');
+}
+function copyLabel(done) {
+  copyBtn.textContent = '';
+  copyBtn.appendChild(icon(done ? 'check' : 'copy'));
+  copyBtn.appendChild(document.createTextNode(T(done ? 'copied' : 'copy_url')));
+  copyBtn.classList.toggle('done', !!done);
+}
+/* 無料版: URL をコピーするたびに出す、クレジット表記のお願い */
+var creditBox, creditBtn, creditTxt, creditTimer = 0;
+var CREDIT_URLS = '\nBOOTH: https://amemineamane.booth.pm/\nX: https://x.com/AmemineAmane';
+function creditLabel(done) {
+  creditBtn.textContent = '';
+  creditBtn.appendChild(icon(done ? 'check' : 'copy'));
+  creditBtn.appendChild(document.createTextNode(T(done ? 'credit_copied' : 'credit_copy')));
+  creditBtn.classList.toggle('done', !!done);
+}
+function buildCredit(bar) {
+  var x = h('button', { type: 'button', class: 'link', text: T('credit_close') });
+  creditTxt = h('pre', { class: 'cr-text', tabindex: '0', 'aria-label': T('credit_box_aria'), text: T('credit_line1') + CREDIT_URLS });
+  creditBtn = h('button', { type: 'button', class: 'btn' });
+  creditLabel(false);
+  creditBtn.addEventListener('click', function () {
+    copyText(creditTxt.textContent, function (ok) {
+      if (!ok) { try { var r = document.createRange(); r.selectNodeContents(creditTxt); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); creditTxt.focus(); } catch (e) {} return; }
+      creditLabel(true);
+      clearTimeout(creditTimer); creditTimer = setTimeout(function () { creditLabel(false); }, 2000);
+    });
+  });
+  x.addEventListener('click', function () { creditBox.hidden = true; });
+  creditBox = h('div', { class: 'credit', id: 'creditBox', role: 'status', hidden: '' }, [
+    h('div', { class: 'cr-h' }, [h('span', { text: T('credit_head') }), x]),
+    h('div', { class: 'cr-body' }, [creditTxt, creditBtn]),
+    h('div', { class: 'cr-foot' }, [T('credit_rt') + ' ', h('a', { href: CS.PAID_URL, target: '_blank', rel: 'noopener', text: T('credit_paid') })])
+  ]);
+  bar.appendChild(creditBox);
+}
+function showCredit() { if (FREE && creditBox) { creditBox.hidden = false; creditLabel(false); } }
+var ctimer = 0;
+function doCopy() {
+  copyText(urlNow(), function (ok) {
+    copyLabel(ok);
+    clearTimeout(ctimer);
+    obsMsg.className = 'obs-msg ' + (ok ? 'ok' : 'ng');
+    obsMsg.textContent = '';
+    if (ok) {
+      var r = recSize();
+      msgState = 'ok';
+      $('obsbar').classList.remove('copyfail');
+      appendParts(obsMsg, 'copy_ok_msg', null, { size: h('span', { class: 'nw', text: T('size_wh', { w: r[0], h: r[1] }) }), mac: h('span', { class: 'nw', text: T('mac_paste') }) });
+      ctimer = setTimeout(function () { copyLabel(false); idleMsg(); }, 6000);
+      showCredit();
+    } else {
+      /* コピーできなかったときは URL 欄を出して (狭い画面でも)、文字を全部選んでおく */
+      msgState = 'ng';
+      $('obsbar').classList.add('copyfail');
+      appendParts(obsMsg, 'copy_ng_msg', null, { keys: h('span', { class: 'nw', text: 'Ctrl + C' }), mac: h('span', { class: 'nw', text: T('mac_copy') }) });
+      try { urlBox.focus({ preventScroll: true }); urlBox.select(); } catch (e) {}
+    }
+    /* はじめてコピーしたときだけ、OBS への入れ方を自動で開く */
+    if (ok && !lsGet(K_COPIED)) { lsSet(K_COPIED, '1'); openHowto(true); }
+  });
+}
+function flashCopy(btn, v) {
+  copyText(String(v), function (ok) {
+    if (!ok) return;
+    btn.classList.add('copied-now');
+    clearTimeout(btn._t); btn._t = setTimeout(function () { btn.classList.remove('copied-now'); }, 1200);
+  });
+}
+
+function buildHowto() {
+  var host = $('howtoIn');
+  $('howtoX').appendChild(icon('x'));
+  $('howtoX').addEventListener('click', function () { closeDlg($('dlgHowto')); });
+  backdropClose($('dlgHowto'));
+  host.appendChild(h('h3', { id: 'howtoTitle', text: T('howto_link'), tabindex: '-1', autofocus: '' }));
+  host.appendChild(h('p', { class: 'lead', text: T('howto_lead') }));
+  var wrap = h('div', { class: 'obswrap' });
+  var mock = h('div', { class: 'mock', role: 'img', 'aria-label': T('mock_aria') });
+  mock.appendChild(h('div', { class: 'src' }, [h('div', { class: 'bd', text: '1' }),
+    h('div', { class: 'srcbar' }, [h('span', { text: T('mock_sources') }), h('span', { class: 'plus', text: '+' }), h('span', { class: 'plusmenu', text: T('mock_pick_browser') })])]));
+  var win = h('div', { class: 'win' });
+  win.appendChild(h('div', { class: 'tbar' }, [h('span', { text: T('mock_props_title') }), h('span', { text: '×' })]));
+  win.appendChild(h('div', { class: 'mrow' }, [h('div', { class: 'bd', text: '2' }), h('div', { class: 'ml', text: T('mock_local_file') }),
+    h('div', { class: 'chk' }, [h('span', { class: 'box' }), h('span', { class: 'dim', text: T('mock_unchecked') })])]));
+  var mUrl = h('span', { class: 'u' });
+  win.appendChild(h('div', { class: 'mrow' }, [h('div', { class: 'bd', text: '3' }), h('div', { class: 'ml', text: T('mock_url') }), h('div', { class: 'field-in' }, [mUrl])]));
+  var mW = h('button', { type: 'button', class: 'field-in', title: T('mock_click_copy_title') });
+  var mH = h('button', { type: 'button', class: 'field-in', title: T('mock_click_copy_title') });
+  var mWv = h('span'), mHv = h('span');
+  mW.appendChild(mWv); mW.appendChild(h('small', { text: T('mock_click_copy') }));
+  mH.appendChild(mHv); mH.appendChild(h('small', { text: T('mock_click_copy') }));
+  win.appendChild(h('div', { class: 'mrow' }, [h('div', { class: 'bd', text: '4' }), h('div', { class: 'ml', text: T('width') }), mW]));
+  win.appendChild(h('div', { class: 'mrow' }, [h('div', { class: 'bd', text: '4' }), h('div', { class: 'ml', text: T('height') }), mH]));
+  win.appendChild(h('div', { class: 'btnrow' }, [h('span', { text: T('mock_ok') }), h('span', { text: T('mock_cancel') })]));
+  mock.appendChild(win);
+  mock.appendChild(h('p', { class: 'cap', text: T('mock_caption') }));
+  wrap.appendChild(mock);
+  var proc = h('div', { class: 'proc' });
+  var ol = h('ol');
+  /* 手順の文は <b> を含む辞書の固定文字列 (step*_html) なので innerHTML で入れる */
+  ['step1_html', 'step2_html', 'step3_html', 'step4_html'].forEach(function (k, i) {
+    var li = h('li', i === 0 ? { id: 'howStep1' } : null);
+    li.innerHTML = T(k);
+    if (i === 0) li.appendChild(h('span', { class: 'donetag', text: T('step_done') }));
+    ol.appendChild(li);
+  });
+  proc.appendChild(ol);
+  var sc = h('div', { class: 'sizecard' });
+  sc.appendChild(h('div', { text: T('sizecard_title') }));
+  var cW = h('button', { type: 'button', title: T('copy_w_title') }), cH = h('button', { type: 'button', title: T('copy_h_title') });
+  sc.appendChild(h('div', { class: 'nums' }, [h('span', { text: T('width') }), cW, h('span', { class: 'x', text: '×' }), h('span', { text: T('height') }), cH]));
+  var scNote = h('div', { class: 'note' });
+  sc.appendChild(scNote);
+  proc.appendChild(sc);
+  var copy2 = h('button', { class: 'btn primary', type: 'button', style: 'margin-top:12px' }, [icon('copy'), T('copy_url')]);
+  copy2.addEventListener('click', function () {
+    copyText(urlNow(), function (ok) {
+      copy2.textContent = ''; copy2.appendChild(icon(ok ? 'check' : 'copy')); copy2.appendChild(document.createTextNode(T(ok ? 'copied' : 'copy_failed')));
+      copy2.classList.toggle('done', ok);
+      if (ok) { lsSet(K_COPIED, '1'); showCredit(); }
+      setTimeout(function () { copy2.textContent = ''; copy2.appendChild(icon('copy')); copy2.appendChild(document.createTextNode(T('copy_url'))); copy2.classList.remove('done'); }, 3000);
+    });
+  });
+  proc.appendChild(copy2);
+  wrap.appendChild(proc);
+  host.appendChild(wrap);
+  mW.addEventListener('click', function () { flashCopy(mW, recSize()[0]); });
+  mH.addEventListener('click', function () { flashCopy(mH, recSize()[1]); });
+  cW.addEventListener('click', function () { flashCopy(cW, recSize()[0]); });
+  cH.addEventListener('click', function () { flashCopy(cH, recSize()[1]); });
+  function syncSize() {
+    var r = recSize();
+    mWv.textContent = r[0]; mHv.textContent = r[1]; cW.textContent = r[0]; cH.textContent = r[1];
+    cW.setAttribute('aria-label', T('copy_w_aria', { n: r[0] })); cH.setAttribute('aria-label', T('copy_h_aria', { n: r[1] }));
+    scNote.textContent = (isOver(r) ? OVER_MSG + ' ' : '') + (r[2] ? T('size_note_measured', { m: MARGIN }) : T('size_note_estimate'));
+  }
+  sizeSyncers.push(syncSize);
+  syncers.push(function () { mUrl.textContent = urlNow(); });
+
+  host.appendChild(h('h4', { text: T('howto_h_noconfig') }));
+  host.appendChild(h('p', { class: 'lead', text: T('howto_noconfig') }));
+  host.appendChild(h('h4', { text: T('howto_h_later') }));
+  var impLink = h('button', { type: 'button', class: 'link', style: 'padding:0;font-size:inherit' }, [T('import_link')]);
+  impLink.addEventListener('click', function () { closeDlg($('dlgHowto')); openImport(); });
+  host.appendChild(appendParts(h('p', { class: 'lead' }), 'howto_later', null, { link: impLink }));
+  host.appendChild(h('h4', { text: T('howto_h_trouble') }));
+  var tr = h('div', { class: 'trouble' });
+  [1, 2, 3, 4].forEach(function (i) { tr.appendChild(h('details', null, [h('summary', { text: T('trouble_' + i + '_q') }), h('p', { text: T('trouble_' + i + '_a') })])); });
+  host.appendChild(tr);
+  host.appendChild(h('div', { class: 'acts' }, [h('button', { class: 'btn', type: 'button', text: T('close'), onclick: function () { closeDlg($('dlgHowto')); } })]));
+}
+/* auto: はじめてのコピーで自動で開いたとき (手順 1 に「済み」の印) */
+function openHowto(auto) { endTrial(); $('howStep1').classList.toggle('done', auto === true); openDlg($('dlgHowto')); var d = $('howtoIn'); d.scrollTop = 0; }
+
+function openImport() {
+  var t = $('impText'), m = $('impMsg');
+  t.value = ''; t.removeAttribute('aria-invalid');   /* 開くたびに前の入力とエラーを消す */
+  m.className = 'msg'; m.textContent = '';
+  openDlg($('dlgImport'));
+  t.focus();
+}
+/* 貼られた文字から時計の設定 (クエリ文字列) を取り出す。時計の URL でなければ null
+ *   受け付けるのは: ? の前が clock.html で終わり、かつ ? の後ろに既知のキーが 1 つ以上ある (または ? がなく既定値のまま) もの */
+function importQuery(s) {
+  var base = s.split(/[?#]/)[0];
+  if (!/clock\.html$/i.test(base)) return null;
+  var qi = s.indexOf('?'), q = qi < 0 ? '' : s.slice(qi + 1).split('#')[0];
+  if (!q) return '';
+  var known = q.split('&').some(function (p) {
+    var k = p.split('=')[0];
+    try { k = decodeURIComponent(k); } catch (e) { return false; }
+    return k !== '' && D.hasOwnProperty(k);
+  });
+  return known ? q : null;
+}
+function rawParam(q, key) {
+  var ps = q.split('&');
+  for (var i = 0; i < ps.length; i++) {
+    var eq = ps[i].indexOf('='), k = eq < 0 ? ps[i] : ps[i].slice(0, eq);
+    try { if (decodeURIComponent(k) === key) return decodeURIComponent((eq < 0 ? '' : ps[i].slice(eq + 1)).replace(/\+/g, ' ')); } catch (e) {}
+  }
+  return '';
+}
+function designName(id) {
+  var d = CS.design(id);
+  if (d) return dName(d);
+  var l = (CS.LOCKED_PREVIEW || []).filter(function (x) { return x.id === id; })[0];
+  return l ? dName(l) : '';
+}
+function buildImport() {
+  var host = $('importIn');
+  backdropClose($('dlgImport'));
+  host.appendChild(h('h3', { id: 'impTitle', text: T('import_title') }));
+  host.appendChild(h('p', { style: 'margin:0 0 10px', text: T('import_body') }));
+  var imp = h('textarea', { id: 'impText', placeholder: T('import_placeholder'), 'aria-label': T('import_aria') });
+  var msg = h('div', { class: 'msg', role: 'status', id: 'impMsg' });
+  var go = h('button', { class: 'btn primary', type: 'button', text: T('import_go') });
+  function ng(t) { msg.className = 'msg ng'; msg.textContent = t; imp.setAttribute('aria-invalid', 'true'); }
+  go.addEventListener('click', function () {
+    var s = imp.value.trim();
+    if (!s) { ng(T('import_empty')); return; }
+    var q = importQuery(s);
+    if (q === null) { ng(T('import_bad')); return; }
+    endTrial(true);
+    var prev = {};
+    for (var k in cfg) if (cfg.hasOwnProperty(k)) prev[k] = cfg[k];
+    var parsed = CS.parse(q); delete parsed.t; delete parsed.moon;
+    var next = tidy(CS.parse(q));
+    /* 無料版: 使えないデザイン・有料版の設定は外して読み込み、知らせる */
+    var rawD = rawParam(q, 'd'), note = '';
+    if (FREE) {
+      var dropped = ['c1', 'c2', 'c3', 'font', 'ol', 'anim'].some(function (k) { return String(parsed[k]) !== String(next[k]) && !(k === 'font' && CS.design(next.d) && parsed.font === CS.design(next.d).font); });
+      if (rawD && rawD !== next.d) note = T('import_paid_design', { name: designName(rawD) || rawD, fallback: designName(next.d) }) + (dropped ? T('import_paid_dropped_suffix') : '');
+      else if (dropped) note = T('import_dropped');
+    }
+    cfg = next;
+    changed();
+    imp.value = ''; msg.textContent = ''; msg.className = 'msg'; imp.removeAttribute('aria-invalid');
+    closeDlg($('dlgImport'));
+    revealCard(cfg.d);
+    toast(note || T('import_done'), { label: T('import_undo'), fn: function () {
+      endTrial(true);
+      cfg = prev;
+      changed();
+      revealCard(cfg.d);
+      toast(T('import_undone'));
+    } });
+  });
+  imp.addEventListener('input', function () { if (msg.className === 'msg ng') { msg.className = 'msg'; msg.textContent = ''; imp.removeAttribute('aria-invalid'); } });
+  host.appendChild(imp);
+  host.appendChild(msg);
+  host.appendChild(h('div', { class: 'acts' }, [h('button', { class: 'btn', type: 'button', text: T('cancel'), onclick: function () { closeDlg($('dlgImport')); } }), go]));
+}
+
+function buildUsage() {
+  var host = $('usageIn');
+  backdropClose($('dlgUsage'));
+  host.appendChild(h('h3', { id: 'usageTitle', text: T('usage_title'), tabindex: '-1', autofocus: '' }));
+  var ol = h('ol');
+  [['①', T('usage_1_t'), T('usage_1_d')], ['②', T('usage_2_t'), T('usage_2_d')], ['③', T('usage_3_t'), T('usage_3_d')]]
+    .forEach(function (s) { ol.appendChild(h('li', null, [h('span', { class: 'num', text: s[0] }), h('span', null, [h('b', { text: s[1] }), h('span', { class: 'd', text: s[2] })])])); });
+  host.appendChild(ol);
+  var how = h('button', { class: 'btn primary', type: 'button' }, [icon('book'), T('usage_howto_btn')]);
+  how.addEventListener('click', function () { closeDlg($('dlgUsage')); openHowto(); });
+  host.appendChild(h('div', { class: 'acts' }, [h('button', { class: 'btn', type: 'button', text: T('close'), onclick: function () { closeDlg($('dlgUsage')); } }), how]));
+}
+
+/* ================= 起動 ================= */
+applyI18nDom();
+buildLangSel();
+$('ver').textContent = T('ver_suffix', { ver: CS.VERSION });
+$('ed').textContent = T(FREE ? 'edition_free' : 'edition_paid');
+$('ed').className = 'badge ' + (FREE ? 'free' : 'paid');
+syncTheme();
+$('helpBtn').appendChild(icon('help'));
+$('helpBtn').appendChild(h('span', { class: 'lbl', text: T('help_btn') }));
+$('helpBtn').setAttribute('aria-label', T('help_aria'));
+$('helpBtn').addEventListener('click', function () { openDlg($('dlgUsage')); });
+/* 初回だけのヒント */
+if (lsGet(K_HINT) !== '1') $('hint').hidden = false;
+$('hintX').appendChild(icon('x'));
+$('hintX').addEventListener('click', function () { $('hint').hidden = true; lsSet(K_HINT, '1'); });
+load();
+
+$('frameTgl').checked = showFrame;
+$('frameTgl').addEventListener('change', function () { showFrame = this.checked; applyStage(); });
+$('navPrev').appendChild(icon('left')); $('navPrev').setAttribute('aria-label', T('nav_prev')); $('navPrev').title = T('nav_prev');
+$('navNext').appendChild(icon('right')); $('navNext').setAttribute('aria-label', T('nav_next')); $('navNext').title = T('nav_next');
+$('navPrev').addEventListener('click', function () { stepDesign(-1); });
+$('navNext').addEventListener('click', function () { stepDesign(1); });
+
+/* 狭い画面のタブ */
+function setMTab(t) {
+  document.body.setAttribute('data-mtab', t);
+  $('mtDesign').setAttribute('aria-selected', t === 'design' ? 'true' : 'false');
+  $('mtAdjust').setAttribute('aria-selected', t === 'adjust' ? 'true' : 'false');
+}
+$('mtDesign').addEventListener('click', function () { setMTab('design'); });
+$('mtAdjust').addEventListener('click', function () { setMTab('adjust'); });
+setMTab('design');
+
+/* ダイアログ */
+$('paidClose').addEventListener('click', function () { closeDlg($('dlgPaid')); });
+$('paidGo').addEventListener('click', function () { closeDlg($('dlgPaid')); });
+$('paidLock').appendChild(icon('lock')); $('paidLock').appendChild(document.createTextNode(T('paid_tag')));
+backdropClose($('dlgPaid'));
+backdropClose($('dlgReset'));
+$('resetNo').addEventListener('click', function () { closeDlg($('dlgReset')); });
+$('resetYes').addEventListener('click', function () {
+  endTrial(true);
+  cfg = tidy(CS.parse(''));
+  if (HAS_LANG) { cfg.lang = uiLang; fixClockLang(D.lang); }   /* 時計の言語の「最初の状態」は画面の言語 */
+  closeDlg($('dlgReset'));
+  changed();
+  revealCard(cfg.d);
+  toast(T('toast_reset_all'));
+});
+
+buildDesignCol();
+buildGallery();
+buildAdjustCol();
+buildObsBar();
+buildHowto();
+buildImport();
+buildUsage();
+syncFavs();
+applyFilter();
+pv.src = 'clock.html?' + queryNow();
+applyStage();
+changed();
+revealCard(cfg.d);
+window.addEventListener('resize', layoutPreview);
+if (window.ResizeObserver) new ResizeObserver(layoutPreview).observe($('stage'));
+})();
+</script>
+</body>
+</html>

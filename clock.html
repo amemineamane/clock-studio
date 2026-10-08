@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clock Studio</title>
+<!--
+  きせかえ時計 Clock Studio — 時計本体
+  OBS のブラウザソースに登録して使います (背景は透過)。
+  設定は URL パラメータで渡します。settings.html で URL を作れます。
+-->
+<script src="clock-data.js"></script>
+<script src="i18n/lang.js"></script>
+<style>
+/* ================= 共通 ================= */
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+body { background: transparent; overflow: hidden; margin: 0; }
+
+#stage {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+  display: flex; box-sizing: border-box;
+}
+#stage.ax-l { justify-content: flex-start; }
+#stage.ax-c { justify-content: center; }
+#stage.ax-r { justify-content: flex-end; }
+#stage.ay-t { align-items: flex-start; }
+#stage.ay-m { align-items: center; }
+#stage.ay-b { align-items: flex-end; }
+
+.cs {
+  --c1: #fff; --c2: #000; --c3: #fff;
+  --c1rgb: 255,255,255; --c2rgb: 0,0,0; --c3rgb: 255,255,255;
+  --tsh: 0 0 0 transparent;   /* フチ + ドロップシャドウ (文字用) */
+  --tshS: 0 0 0 transparent;  /* 同 (日付などの小さい文字用) */
+  --shB: 0 0 0 transparent;   /* ドロップシャドウ (プレート用) */
+  --dw: .62;                  /* 数字1文字の固定幅 (em)。フォント読込後に実測 */
+  --al: center;
+  position: relative;
+  display: flex; flex-direction: column; align-items: var(--al);
+  gap: .14em;
+  line-height: 1; white-space: nowrap;
+  font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+.cs.ax-l { --al: flex-start; }
+.cs.ax-r { --al: flex-end; }
+.cs.fw1, .cs.fw1 * { font-weight: 400 !important; }   /* 1ウェイトしかないフォント */
+.cs.mono .g.co { margin: 0 -.12em; }                    /* 等幅フォントはコロンが広すぎるので詰める */
+
+.cs-box { position: relative; display: flex; align-items: center; gap: .14em; }
+.lay-v  .cs-box { flex-direction: column; align-items: var(--al); }
+.lay-vr .cs-box { flex-direction: column-reverse; align-items: var(--al); }
+.lay-h  .cs-box { flex-direction: row; }
+.lay-hr .cs-box { flex-direction: row-reverse; }
+
+.cs-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; z-index: 0; display: none; }
+.cs-bg2 { position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: none; }
+.cs-deco { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: none; z-index: 2; }
+.cs-deco i { position: absolute; display: none; }
+
+.cs-main { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; }
+.cs-time { position: relative; display: inline-flex; align-items: baseline; }
+.cs-line { display: inline-flex; align-items: baseline; }
+.u { display: inline-flex; align-items: baseline; }
+
+.g  { display: inline-block; position: relative; width: calc(var(--dw) * 1em); text-align: center; }
+.g.co { width: auto; padding: 0 .03em; transition: opacity .15s; }
+.g.co.off { opacity: .15; }
+.gi { display: inline-block; position: relative; }
+.co .gi { transform: translateY(-.06em); }
+/* 「1」の字面が極端に細い書体: 時・分の「1」だけ枠を詰める (秒は詰めないので毎秒のガタつきは出ない) */
+.cs.n1 .g.o1 { width: calc(var(--dw) * 1em - var(--n1w)); }
+/* ドット・等幅風の書体のデザインでは詰めない (「12」が「l2」に見えるため) */
+.cs.n1.d-terminal .g.o1, .cs.n1.d-pixel .g.o1 { width: calc(var(--dw) * 1em); }
+
+.cs-ap { font-size: .36em; letter-spacing: .04em; align-self: baseline; }
+.cs-ap.ap-post { margin-left: .35em; }
+.cs-ap.ap-pre  { margin-right: .4em; }
+.cs-ap:empty { display: none; }
+
+.cs-date  { position: relative; z-index: 1; font-size: .34em; line-height: 1.2; letter-spacing: .05em; display: none; }
+.has-date .cs-date { display: block; }
+.cs-label { position: relative; font-size: .3em; line-height: 1.25; letter-spacing: .06em; display: none; }
+.has-label .cs-label { display: block; }
+.cs-date, .cs-label, .cs-time, .cs-ap { text-shadow: var(--tsh); }
+/* 日付・ラベル・AM/PM など小さい文字ではフチを細めに (各デザインの var(--tsh) がこの値になる) */
+.cs-date, .cs-label, .cs-ap, .cs-sub { --tsh: var(--tshS); }
+
+/* 数字が変わるときのアニメ (aa / ab を交互に付け替えて再生する) */
+.anim-fade  .gi.aa { animation: csFadeA .38s ease-out; }
+.anim-fade  .gi.ab { animation: csFadeB .38s ease-out; }
+.anim-slide .gi.aa { animation: csSlideA .34s cubic-bezier(.2,.8,.3,1); }
+.anim-slide .gi.ab { animation: csSlideB .34s cubic-bezier(.2,.8,.3,1); }
+.anim-pop   .gi.aa { animation: csPopA .36s cubic-bezier(.3,1.6,.5,1); }
+.anim-pop   .gi.ab { animation: csPopB .36s cubic-bezier(.3,1.6,.5,1); }
+@keyframes csFadeA  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes csFadeB  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes csSlideA { from { opacity: 0; transform: translateY(-.35em); } to { opacity: 1; transform: none; } }
+@keyframes csSlideB { from { opacity: 0; transform: translateY(-.35em); } to { opacity: 1; transform: none; } }
+@keyframes csPopA   { from { transform: scale(1.35); } to { transform: none; } }
+@keyframes csPopB   { from { transform: scale(1.35); } to { transform: none; } }
+
+/* 実寸の計測用コピー (見えない場所で、アニメを止めた状態の外接矩形を測る) */
+.cs-measure, .cs-measure *, .cs-measure *::before, .cs-measure *::after { animation: none !important; transition: none !important; }
+
+/* ================= plain (プレーン) ================= */
+.d-plain { color: var(--c1); }
+.d-plain .cs-time { font-weight: 700; }
+/* 明るい背景でも読めるよう、細く濃い影 (輪郭) を重ねてから柔らかい影を敷く */
+.d-plain .cs-time, .d-plain .cs-date, .d-plain .cs-label {
+  text-shadow: var(--tsh), .012em 0 0 rgba(var(--c2rgb), .35), -.012em 0 0 rgba(var(--c2rgb), .35), 0 .012em 0 rgba(var(--c2rgb), .35), 0 -.012em 0 rgba(var(--c2rgb), .35),
+               0 0 .012em rgba(var(--c2rgb), .6), 0 .012em .025em rgba(var(--c2rgb), .55),
+               0 .02em .03em rgba(var(--c2rgb), .45), 0 .03em .1em rgba(var(--c2rgb), .45), 0 0 .3em rgba(var(--c2rgb), .32);
+}
+.d-plain .cs-date, .d-plain .cs-label, .d-plain .cs-ap {
+  text-shadow: var(--tsh), .03em 0 0 rgba(var(--c2rgb), .4), -.03em 0 0 rgba(var(--c2rgb), .4), 0 .03em 0 rgba(var(--c2rgb), .4), 0 -.03em 0 rgba(var(--c2rgb), .4),
+               0 0 .04em rgba(var(--c2rgb), .65), 0 .04em .07em rgba(var(--c2rgb), .55),
+               0 .06em .25em rgba(var(--c2rgb), .45), 0 0 .8em rgba(var(--c2rgb), .3);
+}
+.d-plain .cs-date { font-weight: 700; letter-spacing: .08em; }
+.d-plain .cs-label { font-weight: 700; letter-spacing: .1em; }
+.d-plain.lay-h .cs-box, .d-plain.lay-hr .cs-box { gap: .3em; }
+
+
+/* ================= pill (ピル) ================= */
+.d-pill { color: var(--c1); }
+.d-pill .cs-box { padding: .14em .5em .16em; }
+.d-pill.lay-v .cs-box, .d-pill.lay-vr .cs-box { padding: .2em .55em .22em; gap: .08em; }
+.d-pill .cs-bg {
+  display: block; border-radius: 1em;
+  /* 暗い背景でもプレートが見えるよう、上側のハイライトと明るい縁を付ける */
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.02) 55%, rgba(255,255,255,.05)), rgba(var(--c2rgb), .94);   /* 明るい背景でも板の色が薄まらないよう不透明に近く */
+  box-shadow: inset 0 0 0 .025em rgba(255,255,255,.22), inset 0 .035em 0 rgba(255,255,255,.12), 0 .04em .16em rgba(0,0,0,.22), var(--shB);
+}
+.d-pill .cs-time { font-weight: 800; }
+.d-pill .cs-date { color: var(--c3); font-weight: 700; letter-spacing: .08em; text-shadow: var(--tshS), 0 .03em .08em rgba(0,0,0,.3); }
+.d-pill.lay-h .cs-box, .d-pill.lay-hr .cs-box { gap: 0; }
+.d-pill.lay-h .cs-date  { padding-right: .7em; margin-right: .7em; border-right: .1em solid rgba(var(--c1rgb), .22); }
+.d-pill.lay-hr .cs-date { padding-left: .7em;  margin-left: .7em;  border-left: .1em solid rgba(var(--c1rgb), .22); }
+.d-pill .cs-label {
+  font-weight: 700; color: var(--c1); padding: .22em .9em; border-radius: 1em;
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.02)), rgba(var(--c2rgb), .94);
+  box-shadow: inset 0 0 0 .07em rgba(255,255,255,.22), var(--shB);
+}
+
+
+/* ================= neon (ネオン) ================= */
+.d-neon { color: var(--c3); }
+.d-neon .cs-box { padding: .1em .2em; }
+.d-neon .cs-time {
+  font-weight: 500; letter-spacing: .02em;
+  text-shadow: var(--tsh), 0 0 .03em rgba(var(--c3rgb), .9), 0 0 .08em var(--c1), 0 0 .18em var(--c1),
+               0 0 .42em rgba(var(--c1rgb), .75), 0 0 .8em rgba(var(--c1rgb), .35), 0 0 .05em rgba(0,0,0,.55), 0 .02em .05em rgba(0,0,0,.4), 0 0 .5em rgba(0,0,0,.35);
+  animation: neonFlicker 9s linear infinite;
+  will-change: opacity;
+}
+.d-neon .cs-date, .d-neon .cs-label {
+  font-weight: 700; letter-spacing: .12em;
+  text-shadow: var(--tsh), 0 0 .04em rgba(var(--c3rgb), .9), 0 0 .12em var(--c2), 0 0 .3em var(--c2),
+               0 0 .7em rgba(var(--c2rgb), .6), 0 0 .1em rgba(0,0,0,.6), 0 .02em .05em rgba(0,0,0,.45), 0 0 .5em rgba(0,0,0,.4);
+}
+/* 午前/午後・AM/PM も数字と同じ発光 (時刻の中にあるので書体も同じ。和文は太めに) */
+.d-neon .cs-ap { font-size: .4em; font-weight: 700; letter-spacing: .08em;
+  text-shadow: var(--tshS), 0 0 .04em rgba(var(--c3rgb), .9), 0 0 .1em var(--c1), 0 0 .25em var(--c1),
+               0 0 .6em rgba(var(--c1rgb), .6), 0 0 .1em rgba(0,0,0,.6), 0 0 .5em rgba(0,0,0,.35); }
+.d-neon.lay-h .cs-box, .d-neon.lay-hr .cs-box { gap: .4em; }
+@keyframes neonFlicker {
+  0%, 89%, 100% { opacity: 1; }
+  90% { opacity: .72; }  91% { opacity: 1; }
+  93% { opacity: .82; }  94% { opacity: 1; }
+}
+
+
+/* ================= seg7 (7セグ) ================= */
+.d-seg7 { color: var(--c1); }
+.d-seg7 .cs-box { padding: .2em .4em .2em .36em; }
+.d-seg7.lay-v .cs-box, .d-seg7.lay-vr .cs-box { padding: .2em .42em .22em; gap: .12em; }
+.d-seg7 .cs-bg {
+  display: block; border-radius: .14em;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 50%), rgba(var(--c2rgb), .92);
+  box-shadow: inset 0 0 0 .025em rgba(255,255,255,.06), inset 0 .04em .2em rgba(0,0,0,.6), var(--shB);
+}
+.d-seg7 .cs-time { align-items: flex-end; }
+.s7 { display: inline-block; height: 1em; width: .5em; margin: 0 .07em; transform: skewX(-6deg); overflow: visible; }
+.s7 polygon { fill: rgba(var(--c1rgb), .085); }
+.s7 polygon.on { fill: var(--c1); }
+.s7.on-glow { filter: drop-shadow(0 0 .05em rgba(var(--c1rgb), .55)); }
+.d-seg7 .u-s .s7 { height: .66em; width: .33em; margin: 0 .05em; }
+.s7c { display: inline-flex; flex-direction: column; justify-content: space-around; height: .62em; margin: 0 .03em .19em; transform: skewX(-6deg); }
+.s7c i { display: block; width: .1em; height: .1em; background: var(--c1); box-shadow: 0 0 .06em rgba(var(--c1rgb), .6); transition: background-color .15s, box-shadow .15s; }
+.s7c.off i { background: rgba(var(--c1rgb), .085); box-shadow: none; }
+.d-seg7 .u-s + .s7ap, .d-seg7 .s7ap { margin-left: .22em; }
+.d-seg7 .s7ap.pre { margin-left: 0; margin-right: .2em; }
+.s7ap { display: inline-flex; flex-direction: column; justify-content: space-between; height: 1em; font-size: .3em; padding: .15em 0; box-sizing: border-box; height: 3.33em; letter-spacing: .06em; }
+.s7ap span { color: rgba(var(--c1rgb), .14); }
+.s7ap span.on { color: var(--c1); text-shadow: 0 0 .25em rgba(var(--c1rgb), .6); }
+.d-seg7 .cs-date { letter-spacing: .14em; text-shadow: 0 0 .25em rgba(var(--c1rgb), .5); }
+.d-seg7.lay-h .cs-box, .d-seg7.lay-hr .cs-box { gap: .4em; }
+.d-seg7 .cs-label {
+  padding: .25em .9em; border-radius: .4em; letter-spacing: .14em;
+  background: rgba(var(--c2rgb), .92); box-shadow: var(--shB); text-shadow: 0 0 .25em rgba(var(--c1rgb), .5);
+}
+
+
+/* ================= ticker (ニュース) ================= */
+.d-ticker { color: var(--c3); }
+.d-ticker .cs-box { gap: 0; align-items: stretch; filter: drop-shadow(0 .03em .06em rgba(0,0,0,.3)); }
+.d-ticker { align-items: flex-start; }
+.d-ticker.lay-v .cs-box, .d-ticker.lay-vr .cs-box { align-items: flex-start; }
+.d-ticker.ax-r, .d-ticker.ax-r.lay-v .cs-box, .d-ticker.ax-r.lay-vr .cs-box { align-items: flex-end; }
+.d-ticker .cs-main {
+  padding: .14em .42em .14em .52em;
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,0) 55%), var(--c1);
+  box-shadow: var(--shB);
+}
+.d-ticker .cs-main::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: .11em; background: var(--c2); }
+.d-ticker.has-date.lay-h .cs-main::before, .d-ticker.has-date.lay-hr .cs-main::before { display: none; }
+.d-ticker .cs-time { font-weight: 700; }
+.d-ticker .u-s, .d-ticker .co2 { font-size: .62em; }
+.d-ticker .co2 { margin-left: .04em; }
+.d-ticker .cs-date {
+  display: none; background: var(--c2); color: var(--c3); font-weight: 700; letter-spacing: .06em;
+  padding: .3em .75em; box-shadow: var(--shB);
+}
+.d-ticker.has-date .cs-date { display: flex; align-items: center; }
+.d-ticker:not(.ink-dark) .cs-date { color: var(--c1); }   /* 白帯のような明るい帯の配色: 色タブの日付は帯の色 (白) で */
+.d-ticker.lay-v .cs-date  { border-radius: .3em .3em 0 0; padding: .28em .7em .24em; }
+.d-ticker.lay-vr .cs-date { border-radius: 0 0 .3em .3em; padding: .24em .7em .28em; }
+.d-ticker .cs-label {
+  font-weight: 700; color: var(--c1); background: var(--c3); padding: .22em .75em; letter-spacing: .08em;
+  box-shadow: inset .3em 0 0 var(--c2), var(--shB); padding-left: 1.05em; margin-top: -.1em; text-shadow: none;
+}
+
+/* ================= pastel (パステル) ================= */
+.d-pastel { color: var(--c3); margin: .1em .14em; }
+.d-pastel .cs-box { padding: .2em .62em .22em; }
+.d-pastel.lay-v .cs-box, .d-pastel.lay-vr .cs-box { padding: .22em .66em .24em; gap: .12em; }
+.d-pastel .cs-bg {
+  display: block; border-radius: .42em;
+  background: linear-gradient(135deg, var(--c1), var(--c2));
+  box-shadow: inset 0 0 0 .05em rgba(255,255,255,.9), inset 0 .1em .2em rgba(255,255,255,.35),
+              0 .05em .18em rgba(70, 50, 100, .2), var(--shB);
+}
+.d-pastel .cs-time { font-weight: 700; }
+.d-pastel .cs-time, .d-pastel .cs-date, .d-pastel .cs-label { text-shadow: var(--tsh), 0 .03em 0 rgba(255,255,255,.7); }
+.d-pastel .cs-date {
+  font-weight: 700; letter-spacing: .08em; padding: .26em .85em .28em; border-radius: 1em;
+  background: rgba(255,255,255,.72);
+}
+.d-pastel.lay-h .cs-box, .d-pastel.lay-hr .cs-box { gap: .3em; }
+.d-pastel .cs-label {
+  font-weight: 700; letter-spacing: .08em; padding: .25em .95em; border-radius: 1em; margin-top: .15em;
+  background: linear-gradient(135deg, var(--c1), var(--c2));
+  box-shadow: inset 0 0 0 .14em rgba(255,255,255,.9), 0 .1em .3em rgba(70,50,100,.18), var(--shB);
+}
+.d-pastel .cs-deco i { display: block; background: #fff; filter: drop-shadow(0 0 .015em rgba(var(--c3rgb), .55)) drop-shadow(0 .02em .02em rgba(70,50,100,.25)); -webkit-mask-repeat: no-repeat; -webkit-mask-size: contain; -webkit-mask-position: center; }
+.d-pastel .cs-deco .k1, .d-pastel .cs-deco .k3 {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5c.6 4.7 2.9 7.6 7.6 8.4l2.9.4-2.9.4c-4.7.8-7 3.7-7.6 8.4l-.3 2.9-.3-2.9c-.6-4.7-2.9-7.6-7.6-8.4L1.5 10.3l2.3-.4c4.7-.8 7-3.7 7.6-8.4z'/%3E%3C/svg%3E");
+}
+.d-pastel .cs-deco .k2 {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.2 10.6 20C5.4 15.4 2 12.3 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.8-3.4 6.9-8.6 11.5z'/%3E%3C/svg%3E");
+}
+.d-pastel .cs-deco .k1 { width: .32em; height: .32em; left: -.1em; top: -.12em; }
+.d-pastel .cs-deco .k3 { width: .17em; height: .17em; left: .2em; top: -.17em; opacity: .9; }
+.d-pastel .cs-deco .k2 { width: .24em; height: .24em; right: -.07em; bottom: -.07em; transform: rotate(14deg); }
+
+
+/* ================= wafu (和風) ================= */
+.d-wafu { color: var(--c3); margin: .18em .2em .1em; }
+.d-wafu .cs-box { padding: .2em .7em .24em; }
+.d-wafu.lay-v .cs-box, .d-wafu.lay-vr .cs-box { padding: .24em .75em .28em; gap: .12em; }
+.d-wafu .cs-bg {
+  display: block; border-radius: .05em;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,0) 60%),
+    var(--c1);
+  box-shadow: 0 .04em .14em rgba(40,25,10,.28), var(--shB);
+}
+.d-wafu .cs-bg2 { display: block; left: .07em; top: .07em; right: .07em; bottom: .07em; border: .018em solid rgba(var(--c3rgb), .35); }
+.d-wafu .cs-time { font-weight: 800; letter-spacing: .02em; }
+.d-wafu .cs-time, .d-wafu .cs-date, .d-wafu .cs-label { text-shadow: var(--tsh); }
+.d-wafu .cs-date { font-weight: 700; letter-spacing: .2em; color: rgba(var(--c3rgb), .82); }
+.d-wafu .cs-ap { font-weight: 700; }
+.d-wafu.lay-h .cs-box, .d-wafu.lay-hr .cs-box { gap: 0; }
+.d-wafu.lay-h .cs-date  { padding-right: .7em; margin-right: .7em; border-right: .05em solid rgba(var(--c3rgb), .3); }
+.d-wafu.lay-hr .cs-date { padding-left: .7em;  margin-left: .7em;  border-left: .05em solid rgba(var(--c3rgb), .3); }
+.d-wafu .cs-deco .k1 {
+  display: flex; align-items: center; justify-content: center;
+  font-size: .25em; width: 1.5em; height: 1.5em; right: -.55em; top: -.6em;
+  background: var(--c2); color: var(--c1); border-radius: .14em; transform: rotate(5deg);
+  box-shadow: inset 0 0 0 .1em rgba(var(--c1rgb), .55), inset 0 0 0 .16em var(--c2), 0 .05em .12em rgba(60,10,0,.3);
+  font-weight: 800; line-height: 1;
+}
+.d-wafu .cs-deco .k1::before { content: '時'; }
+.d-wafu .cs-label {
+  font-weight: 700; letter-spacing: .2em; padding: .25em .9em; border-radius: .08em; margin-top: .1em;
+  background: var(--c1); box-shadow: inset 0 0 0 .06em rgba(var(--c3rgb), .2), 0 .1em .3em rgba(40,25,10,.25), var(--shB);
+  border-left: .3em solid var(--c2);
+}
+
+
+/* ================= analog (アナログ) ================= */
+.d-analog { color: var(--c2); }
+.an { display: block; width: 3em; height: 3em; overflow: visible; filter: drop-shadow(0 .03em .08em rgba(0,0,0,.28)); }
+.d-analog.sh-on .an { filter: drop-shadow(0 .06em .16em rgba(0,0,0,.55)); }
+.an .face { fill: var(--c1); }
+.an .rim  { fill: none; stroke: rgba(var(--c2rgb), .14); stroke-width: 1.2; }
+.an .mt { stroke: rgba(var(--c2rgb), .45); stroke-width: .7; }
+.an .ht { stroke: var(--c2); stroke-width: 2.3; stroke-linecap: butt; }
+.an .hh, .an .mh { stroke: var(--c2); stroke-linecap: round; }
+.an .hh { stroke-width: 4; }
+.an .mh { stroke-width: 2.6; }
+.an .sh { stroke: var(--c3); stroke-width: 1; stroke-linecap: round; }
+.an .sc { fill: var(--c3); }
+.an .cap { fill: var(--c2); }
+.an .cap2 { fill: var(--c1); }
+.d-analog .cs-date, .d-analog .cs-label {
+  font-size: .25em; font-weight: 700; letter-spacing: .08em; padding: .3em .9em; border-radius: 1em;
+  background: var(--c1); color: var(--c2); box-shadow: 0 .06em .18em rgba(0,0,0,.25), var(--shB);
+}
+.d-analog .cs-box { gap: .12em; }
+
+</style>
+</head>
+<body>
+<div id="stage"><div id="clock" class="cs"></div></div>
+<script>
+(function () {
+'use strict';
+var CS = window.ClockStudio;
+var stage = document.getElementById('stage');
+var root = document.getElementById('clock');
+var SVGNS = 'http://www.w3.org/2000/svg';
+var BASE_PX = 64;                          /* size=100 のときの基準文字サイズ */
+var SINGLE_WEIGHT = { bebas: 1, sharetech: 1, dot: 1, yuji: 1, dela: 1, nixie: 1, elite: 1, stencil: 1 };
+var MONO = { sharetech: 1, robotomono: 1 };
+var WD_JP = ['日', '月', '火', '水', '木', '金', '土'];
+var WD_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var MON_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+var KAN = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+var KAN_DATE = { wafu: 1, tanzaku: 1, kinpaku: 1, sumi: 1 };   /* 日付を漢数字で出すデザイン (jp / jpy / wareki 書式のとき) */
+/* 言葉 (曜日・午前/午後・日付・ことば・進捗バー) は i18n/lang.js の辞書 (cfg.lang = ja / en / zh-TW) で描く。
+ * lang.js が読めないときは LG = null で、日本語固定の従来の処理で描く (cfg.lang も 'ja' に固定)。
+ * 言語で使えない書式 (en の wareki・ap=jp) は URL に残っていても辞書側で描ける形に丸まる (en: wareki → jpy 相当 / jp → AM/PM 後ろ) */
+var LG = window.ClockStudioLang || null;
+var txUsed = false;   /* このデザインが txDark (文字色 c1〜c3 の明暗判定) を使ったか */
+function apWord(pm) {   /* ap=jp → その言語の語 (午前/上午)、en → AM/PM */
+  if (LG) return LG.ap(cfg.lang, cfg.ap === 'off' ? 'en' : cfg.ap, pm);
+  return cfg.ap === 'jp' ? (pm ? '午後' : '午前') : (pm ? 'PM' : 'AM');
+}
+function apPre() { return LG ? LG.apPos(cfg.lang, cfg.ap) === 'pre' : cfg.ap === 'jp'; }   /* AM/PM を時刻の前に置くか */
+
+var cfg, dz, sup, hook;      /* 現在の設定 / デザイン定義 / supports / デザイン別処理 */
+var ui = {};                 /* 組み立てた DOM 部品 */
+var prev = {};               /* 前回描画した値 (変わったところだけ更新する) */
+var timer = 0, tzFmt = null, fontLink = null, fontId = '', glyphIndex = 0, digitIndex = 0;
+var MEAS = false, FORCE_T = null;   /* 実寸の計測中 (見えないコピーを最悪ケースの時刻で組み立てている間) */
+
+/* ---------- 小物 ---------- */
+function el(tag, cls, parent) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function sv(tag, attrs, parent) {
+  var e = document.createElementNS(SVGNS, tag);
+  for (var k in attrs) if (attrs.hasOwnProperty(k)) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function p2(n) { return (n < 10 ? '0' : '') + n; }
+function lumOf(i) { var v = rgb(cfg['c' + i] || dz.colors[i - 1] || 'ffffff').split(','); return v[0] * .299 + v[1] * .587 + v[2] * .114; }   /* 配色 c1〜c3 の明るさ (0〜255) */
+function rgb(hex) { return parseInt(hex.slice(0, 2), 16) + ',' + parseInt(hex.slice(2, 4), 16) + ',' + parseInt(hex.slice(4, 6), 16); }
+
+/* ---------- デザイン別の処理 (特殊な構造のものだけ) ---------- */
+var X = {};
+
+/* --- 7セグ: 数字を SVG のセグメントで自前描画 (液晶・蛍光表示管・電光掲示板も流用) --- */
+var SEG_PTS = {
+  a: '6.6,5 11.6,0 44.4,0 49.4,5 44.4,10 11.6,10',
+  g: '6.6,50 11.6,45 44.4,45 49.4,50 44.4,55 11.6,55',
+  d: '6.6,95 11.6,90 44.4,90 49.4,95 44.4,100 11.6,100',
+  f: '5,6.6 10,11.6 10,43.4 5,48.4 0,43.4 0,11.6',
+  b: '51,6.6 56,11.6 56,43.4 51,48.4 46,43.4 46,11.6',
+  e: '5,51.6 10,56.6 10,88.4 5,93.4 0,88.4 0,56.6',
+  c: '51,51.6 56,56.6 56,88.4 51,93.4 46,88.4 46,56.6'
+};
+var SEG_MAP = { '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd',
+                '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg', ' ': '' };
+function seg7Digit(parent) {
+  var s = sv('svg', { 'class': 's7 on-glow', viewBox: '0 0 56 100', preserveAspectRatio: 'none' }, parent);
+  var segs = {};
+  'abcdefg'.split('').forEach(function (k) { segs[k] = sv('polygon', { points: SEG_PTS[k] }, s); });
+  var cur = null;
+  return function (ch) {
+    if (ch === cur) return;
+    cur = ch;
+    var on = SEG_MAP[ch] || '';
+    for (var k in segs) segs[k].setAttribute('class', on.indexOf(k) >= 0 ? 'on' : '');
+  };
+}
+X.seg7 = {
+  unit: function (kind, parent) {
+    var u = el('span', 'u u-' + kind, parent);
+    var a = seg7Digit(u), b = seg7Digit(u);
+    return { el: u, set: function (str) { if (str.length < 2) str = ' ' + str; a(str.charAt(0)); b(str.charAt(1)); } };
+  },
+  colon: function (parent, second) {
+    var c = el('span', 's7c' + (second ? ' co2' : ''), parent);
+    el('i', '', c); el('i', '', c);
+    return { el: c };
+  },
+  ap: function (parent, pre) {
+    var w = el('span', 's7ap' + (pre ? ' pre' : ''), parent);
+    var a = el('span', '', w), p = el('span', '', w);
+    a.textContent = apWord(false);
+    p.textContent = apWord(true);
+    return { set: function (isPm) { a.className = isPm ? '' : 'on'; p.className = isPm ? 'on' : ''; } };
+  }
+};
+
+
+/* --- アナログ: SVG の文字盤と針 (update は アナログ(黒)・ローマ数字 も流用) --- */
+X.analog = {
+  build: function () {
+    var s = sv('svg', { 'class': 'an', viewBox: '-50 -50 100 100' }, ui.main);
+    sv('circle', { 'class': 'face', r: 48 }, s);
+    sv('circle', { 'class': 'rim', r: 47.4 }, s);
+    for (var i = 0; i < 60; i++) {
+      var hr = i % 5 === 0;
+      sv('line', { 'class': hr ? 'ht' : 'mt', x1: 0, y1: hr ? -35.5 : -40.5, x2: 0, y2: -43,
+                   transform: 'rotate(' + (i * 6) + ')' }, s);
+    }
+    ui.hh = sv('line', { 'class': 'hh', x1: 0, y1: 5, x2: 0, y2: -22 }, s);
+    ui.mh = sv('line', { 'class': 'mh', x1: 0, y1: 6, x2: 0, y2: -34 }, s);
+    if (cfg.sec) {
+      ui.sh = sv('g', {}, s);
+      sv('line', { 'class': 'sh', x1: 0, y1: 10, x2: 0, y2: -38 }, ui.sh);
+      sv('circle', { 'class': 'sc', r: 2.6 }, ui.sh);
+    }
+    sv('circle', { 'class': 'cap', r: cfg.sec ? 1.3 : 2.6 }, s);
+    if (!cfg.sec) sv('circle', { 'class': 'cap2', r: .9 }, s);
+  },
+  update: function (t) {
+    var key = t.h + ':' + t.mi + ':' + t.s;
+    if (prev.an === key) return;
+    prev.an = key;
+    ui.hh.setAttribute('transform', 'rotate(' + ((t.h % 12) * 30 + t.mi * .5 + t.s / 120).toFixed(2) + ')');
+    ui.mh.setAttribute('transform', 'rotate(' + (t.mi * 6 + t.s * .1).toFixed(2) + ')');
+    if (ui.sh) ui.sh.setAttribute('transform', 'rotate(' + (t.s * 6) + ')');
+  }
+};
+
+
+
+
+
+/* ---------- フチ (text-shadow を円周状に並べる) ---------- */
+function ring(w, hex) {
+  var out = [], n = w <= 2 ? 12 : 16, i, a;
+  for (i = 0; i < n; i++) {
+    a = i / n * Math.PI * 2;
+    out.push((Math.cos(a) * w).toFixed(2) + 'px ' + (Math.sin(a) * w).toFixed(2) + 'px 0 #' + hex);
+  }
+  if (w >= 3) {
+    var w2 = w / 2;
+    for (i = 0; i < 8; i++) {
+      a = (i + .5) / 8 * Math.PI * 2;
+      out.push((Math.cos(a) * w2).toFixed(2) + 'px ' + (Math.sin(a) * w2).toFixed(2) + 'px 0 #' + hex);
+    }
+  }
+  return out.join(',');
+}
+function shiftRing(w, dy, hex, alpha) {
+  var out = [], c = 'rgba(' + rgb(hex) + ',' + alpha + ')';
+  for (var i = 0; i < 8; i++) {
+    var a = i / 8 * Math.PI * 2;
+    out.push((Math.cos(a) * w).toFixed(2) + 'px ' + (Math.sin(a) * w + dy).toFixed(2) + 'px 0 ' + c);
+  }
+  return out.join(',');
+}
+
+/* ---------- 現在時刻 ---------- */
+function now() {
+  if (FORCE_T) return FORCE_T;
+  if (cfg.t) {
+    var a = cfg.t.split(':');
+    return { y: 2026, mo: 10, d: 3, wd: 6, h: +a[0], mi: +a[1], s: +a[2] };
+  }
+  var n = new Date();
+  if (tzFmt) {
+    try {
+      var parts = tzFmt.formatToParts(n), o = {};
+      for (var i = 0; i < parts.length; i++) o[parts[i].type] = parts[i].value;
+      var y = +o.year, mo = +o.month, d = +o.day;
+      return { y: y, mo: mo, d: d, wd: new Date(Date.UTC(y, mo - 1, d)).getUTCDay(),
+               h: (+o.hour) % 24, mi: +o.minute, s: +o.second };
+    } catch (e) { tzFmt = null; }
+  }
+  return { y: n.getFullYear(), mo: n.getMonth() + 1, d: n.getDate(), wd: n.getDay(),
+           h: n.getHours(), mi: n.getMinutes(), s: n.getSeconds() };
+}
+
+/* ---------- 日付の書式 ---------- */
+function kanNum(n) {   /* 1〜99 を漢数字に (十月三日 など) */
+  if (n < 10) return KAN[n];
+  var t = Math.floor(n / 10), o = n % 10;
+  return (t > 1 ? KAN[t] : '') + '十' + (o ? KAN[o] : '');
+}
+function kanYear(y) { return String(y).split('').map(function (c) { return KAN[+c]; }).join(''); }
+function fmtDate(t) {
+  if (LG) return LG.formatDate(cfg.lang, cfg.df, t, KAN_DATE[dz.id] === 1);
+  var kan = KAN_DATE[dz.id] === 1, w = WD_JP[t.wd];
+  var md = kan ? kanNum(t.mo) + '月' + kanNum(t.d) + '日' : t.mo + '月' + t.d + '日';
+  var wds = kan ? ' ' + w + '曜' : '(' + w + ')';
+  switch (cfg.df) {
+    case 'jpy': return (kan ? kanYear(t.y) : t.y) + '年' + md + wds;
+    case 'wareki': {
+      var era = '令和', ey = t.y - 2018;
+      if (t.y < 2019 || (t.y === 2019 && t.mo < 5)) { era = '平成'; ey = t.y - 1988; }
+      return era + (ey === 1 ? '元' : kan ? kanNum(ey) : ey) + '年' + md + wds;
+    }
+    case 'slash': return t.y + '/' + p2(t.mo) + '/' + p2(t.d) + ' ' + WD_EN[t.wd];
+    case 'dot':   return t.y + '.' + p2(t.mo) + '.' + p2(t.d) + ' ' + WD_EN[t.wd].toUpperCase();
+    case 'en':    return WD_EN[t.wd] + ', ' + MON_EN[t.mo - 1] + ' ' + t.d;
+    default:      return md + wds;
+  }
+}
+
+/* ---------- 文字 (1文字ずつ固定幅の箱に入れる) ---------- */
+function glyph(parent, cls) {
+  var g = el('span', 'g ' + cls, parent);
+  var gi = el('span', 'gi', g);
+  g.style.setProperty('--i', glyphIndex++);
+  var cur = null, alt = false;
+  return { el: g, set: function (c) {
+    if (c === cur) return;
+    var first = cur === null;
+    cur = c;
+    if (c === '') { g.style.display = 'none'; return; }
+    g.style.display = '';
+    gi.textContent = c;
+    gi.setAttribute('data-c', c);
+    if (!first && cfg.anim !== 'none') { alt = !alt; gi.className = 'gi ' + (alt ? 'aa' : 'ab'); }
+  } };
+}
+function unitDefault(kind, parent) {
+  var u = el('span', 'u u-' + kind, parent);
+  var a = glyph(u, 'dg p' + (digitIndex++ % 3)), b = glyph(u, 'dg p' + (digitIndex++ % 3));
+  var o1a = false, o1b = false, slim = kind !== 's';
+  return { el: u, set: function (str) {
+    if (str.length < 2) { a.set(''); b.set(str); } else { a.set(str.charAt(0)); b.set(str.charAt(1)); }
+    /* 細い「1」は時・分だけ枠を詰める (変わるのは最短でも1分に1回。秒は毎秒ガタつくので詰めない) */
+    if (!slim || MEAS) return;   /* 計測用のコピーでは詰めない (常に最大幅で測る) */
+    var na = str.length > 1 && str.charAt(0) === '1', nb = str.charAt(str.length - 1) === '1';
+    if (na !== o1a) { a.el.classList.toggle('o1', na); o1a = na; }
+    if (nb !== o1b) { b.el.classList.toggle('o1', nb); o1b = nb; }
+  } };
+}
+function colonDefault(parent, second) {
+  var c = glyph(parent, 'co' + (second ? ' co2' : ''));
+  c.set(':');
+  return c;
+}
+function apDefault(parent, pre) {
+  var e = el('span', 'cs-ap ' + (pre ? 'ap-pre' : 'ap-post'), parent);
+  var cur = null;
+  return { set: function (isPm) {
+    if (isPm === cur) return;
+    cur = isPm;
+    e.textContent = apWord(isPm);
+  } };
+}
+
+/* 時刻部分を組み立てる (o.secLine=true なら秒を2行目に小さく) */
+function buildTime(parent, o) {
+  o = o || {};
+  var mkU = (hook && hook.unit) || unitDefault;
+  var mkC = (hook && hook.colon) || colonDefault;
+  var mkA = (hook && hook.ap) || apDefault;
+  var t = el('div', 'cs-time', parent);
+  ui.time = t;
+  var line = o.secLine ? el('div', 'cs-line', t) : t;
+  var useAp = cfg.h12 && cfg.ap !== 'off';
+  var pre = apPre();
+  if (useAp && pre) ui.ap = mkA(line, true);
+  ui.u.h = mkU('h', line);
+  ui.colons.push(mkC(line, false));
+  ui.u.m = mkU('m', line);
+  if (cfg.sec) {
+    if (o.secLine) {
+      ui.u.s = mkU('s', el('div', 'cs-sub', t));
+    } else {
+      ui.colons.push(mkC(line, true));
+      ui.u.s = mkU('s', line);
+    }
+  }
+  if (useAp && !pre) ui.ap = mkA(line, false);
+}
+
+/* ---------- DOM の組み立て ---------- */
+function build() {
+  root.innerHTML = '';
+  var fxs = document.getElementById('cs-fx');   /* デザイン用の SVG フィルタ (テロップ) は組み立てのたびに作り直す */
+  if (fxs && !MEAS) fxs.parentNode.removeChild(fxs);   /* 計測用のコピーは本物のフィルタをそのまま使う */
+  ui = { u: {}, colons: [] };
+  prev = {};
+  glyphIndex = 0; digitIndex = 0;
+  var box = el('div', 'cs-box', root);
+  ui.box = box;
+  ui.bg = el('div', 'cs-bg', box);
+  el('div', 'cs-bg2', ui.bg);
+  var deco = el('div', 'cs-deco', box);
+  for (var i = 1; i <= 5; i++) el('i', 'k' + i, deco);
+  ui.date = el('div', 'cs-date', box);
+  ui.main = el('div', 'cs-main', box);
+  ui.label = el('div', 'cs-label', root);
+  ui.label.textContent = cfg.label;   /* ラベルは必ず textContent */
+  if (hook && hook.build) hook.build(); else buildTime(ui.main);
+}
+
+/* ---------- 描画 (変わったところだけ書き換える) ---------- */
+function render() {
+  var t = now();
+  var h = t.h;
+  if (cfg.h12) { if (ui.ap) ui.ap.set(h >= 12); h = h % 12 || 12; }
+  var hs = cfg.pad ? p2(h) : String(h);
+  if (ui.u.h) ui.u.h.set(hs);
+  if (ui.u.m) ui.u.m.set(p2(t.mi));
+  if (ui.u.s) ui.u.s.set(p2(t.s));
+  if (cfg.date) {
+    var ds = fmtDate(t);
+    if (ds !== prev.date) { ui.date.textContent = ds; prev.date = ds; }
+  }
+  if (cfg.blink) {
+    var off = t.s % 2 === 1;
+    if (off !== prev.off) {
+      for (var i = 0; i < ui.colons.length; i++) ui.colons[i].el.classList.toggle('off', off);
+      prev.off = off;
+    }
+  }
+  if (hook && hook.update) hook.update(t);
+}
+
+/* 次の秒境界に合わせて setTimeout を張り直す (ドリフト防止) */
+function schedule() {
+  clearTimeout(timer);
+  if (cfg.t) return;  /* 時刻固定モードは更新しない */
+  timer = setTimeout(function () { render(); schedule(); }, 1000 - (Date.now() % 1000) + 6);
+}
+
+/* ---------- フォント ---------- */
+var fontsSettled = false;   /* 書体の読み込みが終わった (または諦めた) か。終わるまで実寸の通知を出さない */
+function fontsDone() {
+  if (fontsSettled) return;
+  fontsSettled = true;
+  measure();
+  notifySize(false);   /* 時刻の文字が無いデザイン (アナログ) は measure が通知しないので */
+}
+function loadFont(id) {
+  var f = CS.font(id);
+  if (!f) { fontsDone(); return; }
+  if (id === fontId) return;
+  fontId = id;
+  fontsSettled = false;
+  setTimeout(fontsDone, 4000);   /* 読み込みが終わらない (オフライン等) ときの保険 */
+  if (fontLink && fontLink.parentNode) fontLink.parentNode.removeChild(fontLink);
+  fontLink = document.createElement('link');
+  fontLink.rel = 'stylesheet';
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=' + f.google + '&display=swap';
+  fontLink.onload = function () {
+    if (document.fonts && document.fonts.load) {
+      var fam = f.css.split(',')[0];
+      Promise.all([document.fonts.load('400 1em ' + fam, '0123456789:'), document.fonts.load('700 1em ' + fam, '0123456789:')])
+        .then(fontsDone, fontsDone);
+    } else fontsDone();
+  };
+  fontLink.onerror = fontsDone;
+  document.head.appendChild(fontLink);
+}
+
+/* 数字の字面 (インク) の幅を 100px で測る: { one: 「1」の幅, max: 1 以外の最大幅 }。測れなければ null */
+var inkCanvas = null;
+function inkWidths(t) {
+  try {
+    var cs = getComputedStyle(t);
+    inkCanvas = inkCanvas || document.createElement('canvas');
+    var g = inkCanvas.getContext('2d');
+    g.font = cs.fontStyle + ' ' + cs.fontWeight + ' 100px ' + cs.fontFamily;
+    var m = g.measureText('1');
+    if (m.actualBoundingBoxRight === undefined) return null;
+    var one = m.actualBoundingBoxRight + m.actualBoundingBoxLeft, max = 0;
+    for (var d = 0; d < 10; d++) {
+      if (d === 1) continue;
+      var q = g.measureText(String(d));
+      max = Math.max(max, q.actualBoundingBoxRight + q.actualBoundingBoxLeft);
+    }
+    return one > 0 && max > 0 ? { one: one, max: max } : null;
+  } catch (e) { return null; }
+}
+/* 数字の最大幅を実測して --dw に入れる (等幅でないフォントでもガタつかない) */
+function measure() {
+  var t = ui.time;
+  if (!t || !t.isConnected) return;
+  var probe = el('span', '', t);
+  probe.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:nowrap;font-size:100px;';
+  var max = 0, spans = [], w1 = 0;
+  for (var d = 0; d < 10; d++) { var s = el('span', '', probe); s.textContent = String(d); spans.push(s); }
+  /* offsetWidth は transform (傾き・回転) の影響を受けないので、傾けたデザインでも正しい幅になる */
+  for (d = 0; d < 10; d++) { if (d === 1) w1 = spans[d].getBoundingClientRect().width; else max = Math.max(max, spans[d].offsetWidth); }
+  t.removeChild(probe);
+  if (hook && hook.fit) { prev.fit = null; hook.fit(); }
+  if (max > 0) {
+    root.style.setProperty('--dw', (Math.max(max, w1) / 100 + .02).toFixed(3));
+    /* 「1」の字面が極端に細い書体は、時・分の「1」の枠を詰める量 (--n1w) を決める。
+     * 等幅数字 (tnum) の書体は送り幅が同じでも字面が細いので、canvas で字面 (インク) の幅を測って比べる */
+    var ink = inkWidths(t), cut = 0;
+    if (ink && ink.one < ink.max * .62) cut = (ink.max - ink.one) / 100 * .55;
+    root.classList.toggle('n1', cut > .05);
+    if (cut > .05) root.style.setProperty('--n1w', cut.toFixed(3) + 'em');
+  }
+  notifySize(false);
+}
+
+/* ---------- 実寸の通知 (iframe 内のときだけ。settings.html が推奨サイズを出すため) ----------
+ * { type:'clock-studio:size', w, h } … 時計全体 (プレート・飾り・影・グロー・ラベル込み) の見た目の外接矩形。
+ * CSS ピクセル (size% 適用後)、整数に切り上げ。設定の適用後に1回、その後は大きさが変わったときだけ送る。 */
+var IN_FRAME = false;
+try { IN_FRAME = window.parent && window.parent !== window; } catch (e) { IN_FRAME = true; }
+var sizeTimer = 0, sizeForce = false, lastSize = '';
+function notifySize(force) {
+  if (!IN_FRAME) return;
+  if (force) sizeForce = true;
+  clearTimeout(sizeTimer);
+  if (!fontsSettled) return;   /* 書体の読み込み前の大きさは送らない (読み込み後の measure から送り直す) */
+  sizeTimer = setTimeout(function () {
+    /* 読み込み中の書体 (和文の追加の字など) があれば、終わってから測る */
+    if (document.fonts && document.fonts.status === 'loading' && document.fonts.ready) {
+      document.fonts.ready.then(function () { notifySize(false); });
+      return;
+    }
+    var r = visualSize();
+    var key = r.w + 'x' + r.h;
+    if (!sizeForce && key === lastSize) return;
+    sizeForce = false;
+    lastSize = key;
+    try { window.parent.postMessage({ type: 'clock-studio:size', w: r.w, h: r.h }, '*'); } catch (e) {}
+  }, 80);
+}
+/* "rgba(0, 0, 0, 0.5) 1px 2px 3px 0px, ..." の形の影リストから、はみ出し量 (左・上・右・下) を求める */
+function splitTop(s) {
+  var out = [], depth = 0, start = 0;
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charAt(i);
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === ',' && depth === 0) { out.push(s.slice(start, i)); start = i + 1; }
+  }
+  out.push(s.slice(start));
+  return out;
+}
+/* 影のぼかしが「見える」範囲 (不透明度が約 2% を切るところまで)。
+ * 面 (プレート・図形) の影はガウスぼかしの裾を濃さから見積もる。文字の影は線が細く薄く広がるので半径の半分で数える */
+function blurReach(blur, alpha, isText) {
+  if (blur <= 0) return 0;
+  if (isText) return blur * .5;
+  var p = .02 / Math.max(alpha, .001);
+  if (p >= .5) return 0;
+  return blur / 2 * Math.sqrt(-2 * Math.log(2 * p));
+}
+function addShadows(str, ext, useSpread, isText) {
+  if (!str || str === 'none') return;
+  var parts = splitTop(str);
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (/inset/.test(p)) continue;
+    var col = /rgba\(([^)]*)\)/.exec(p);
+    var alpha = col ? parseFloat(col[1].split(',')[3]) : 1;
+    if (!(alpha > 0)) continue;   /* 透明な影は無視 */
+    var n = p.replace(/[a-z]+\([^)]*\)/g, '').match(/-?[\d.]+(?:e-?\d+)?px/g) || [];
+    var x = parseFloat(n[0]) || 0, y = parseFloat(n[1]) || 0, b = blurReach(parseFloat(n[2]) || 0, alpha, isText);
+    var s = useSpread ? (parseFloat(n[3]) || 0) : 0;
+    var r = b + s;
+    if (r - x > ext[0]) ext[0] = r - x;
+    if (r - y > ext[1]) ext[1] = r - y;
+    if (r + x > ext[2]) ext[2] = r + x;
+    if (r + y > ext[3]) ext[3] = r + y;
+  }
+}
+function hasText(e) {
+  for (var c = e.firstChild; c; c = c.nextSibling) if (c.nodeType === 3 && /\S/.test(c.nodeValue)) return true;
+  return false;
+}
+/* 実寸は「最も大きくなる時刻・日付」で測る (今の時刻で測ると、pad=0 の 1 桁の時や短い漢数字のときに小さく出て、
+ * 10 時台や長い時刻で枠からはみ出すため)。字幅は書体で違うので候補を全部組み立てて測り、幅・高さそれぞれの最大を返す */
+var WORST_T = [[0, 0, 0], [10, 58, 58], [12, 48, 48], [20, 58, 58], [22, 58, 58], [23, 59, 59]];
+function visualSize() {
+  /* 見えない場所に計測用の時計をもう 1 つ組み立てる (本物の表示には触らない。アニメは止める) */
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;display:flex;align-items:flex-start;';
+  var c = root.cloneNode(false);
+  c.removeAttribute('id');
+  c.className += ' cs-measure';
+  wrap.appendChild(c);
+  document.body.appendChild(wrap);
+  var keep = { root: root, ui: ui, prev: prev, gi: glyphIndex, di: digitIndex };
+  var t0 = now(), W = 0, H = 0;
+  /* 日付ありのときは今日の日付と「長い日付」(12月28日 水曜) の両方で測る */
+  var dates = cfg.date || dz.id === 'koyomi' ? [t0, { y: t0.y, mo: 12, d: 28, wd: 3 }] : [t0];
+  if (dates.length > 1 && cfg.lang === 'en') dates.push({ y: t0.y, mo: 9, d: 28, wd: 3 });   /* Wed, Sep 28 / SEPTEMBER */
+  try {
+    MEAS = true;
+    root = c;
+    build();
+    for (var i = 0; i < dates.length; i++) {
+      for (var j = 0; j < WORST_T.length; j++) {
+        var d = dates[i], w = WORST_T[j];
+        FORCE_T = { y: d.y, mo: d.mo, d: d.d, wd: d.wd, h: w[0], mi: w[1], s: w[2] };
+        render();
+        var r = boxOf(c);
+        if (r.w > W) W = r.w;
+        if (r.h > H) H = r.h;
+      }
+    }
+  } finally {
+    MEAS = false; FORCE_T = null;
+    root = keep.root; ui = keep.ui; prev = keep.prev; glyphIndex = keep.gi; digitIndex = keep.di;
+    document.body.removeChild(wrap);
+  }
+  return { w: W, h: H };
+}
+/* 要素 c (と子孫) の見た目の外接矩形 (影・グロー・はみ出す飾り込み) */
+function boxOf(c) {
+  var L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+  var list = [c].concat(Array.prototype.slice.call(c.getElementsByTagName('*'))), k;
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    if (e.closest && e.closest('defs, clipPath, mask, .cs-clip')) continue;   /* .cs-clip = 板の中で切り抜かれる飾り (はみ出さない) */
+    var q = e.getBoundingClientRect();
+    if (!q.width && !q.height) continue;
+    var cs = getComputedStyle(e), ext = [0, 0, 0, 0];
+    addShadows(cs.boxShadow, ext, true, false);
+    if (hasText(e)) addShadows(cs.textShadow, ext, false, true);
+    /* filter の drop-shadow は重ねがけで効果が積み重なるので合計する。親に掛かったフィルタは子 (はみ出す飾り) にも効く */
+    var fx = (e.parentNode && e.parentNode.__csFx) || null;
+    if (cs.filter && cs.filter !== 'none') {
+      var m, re = /drop-shadow\(((?:[^()]|\([^()]*\))*)\)/g, own = [0, 0, 0, 0];
+      while ((m = re.exec(cs.filter))) {
+        var one = [0, 0, 0, 0];
+        addShadows(m[1], one, false, false);
+        for (k = 0; k < 4; k++) own[k] += one[k];
+      }
+      if (fx) for (k = 0; k < 4; k++) own[k] += fx[k];
+      fx = own;
+    }
+    e.__csFx = fx;
+    if (fx) for (k = 0; k < 4; k++) if (fx[k] > ext[k]) ext[k] = fx[k];
+    L = Math.min(L, q.left - ext[0]); T = Math.min(T, q.top - ext[1]);
+    R = Math.max(R, q.right + ext[2]); B = Math.max(B, q.bottom + ext[3]);
+  }
+  if (!isFinite(L)) return { w: 0, h: 0 };
+  return { w: Math.ceil(R - L - .01), h: Math.ceil(B - T - .01) };
+}
+
+/* ---------- フチ・影の CSS 変数 (組み立ての後に呼ぶ: 文字色を実際の表示から判定するため) ----------
+ * --tsh = 時刻用、--tshS = 日付などの小さい文字用 (デザイン既定のフチは細めにする)。
+ * フチ色 olc が既定 (黒) のままで、そのデザインの文字が暗いときは、黒フチだと字が潰れるので自動で白にする
+ * (ユーザーが olc を黒以外にしていればその色)。--tshA = 地の明るい差し色の上の暗い文字 (スポーツの秒など) 用の反対色のフチ */
+function isDarkColor(css) {
+  var m = /rgba?\(([^)]*)\)/.exec(css || '');
+  if (!m) return null;
+  var v = m[1].split(',').map(parseFloat);
+  if (v.length > 3 && !(v[3] >= .5)) return null;   /* 透明 (グラデ文字など) は判定しない */
+  return v[0] * .299 + v[1] * .587 + v[2] * .114 < 110;
+}
+function outlineVars(scale) {
+  var st = root.style, shadows = [], small = [], alt = [];
+  if (cfg.ol > 0) {
+    var dark = ui.time ? isDarkColor(getComputedStyle(ui.time).color) : null;
+    if (dark === null) dark = root.classList.contains(txUsed ? 'tx-dark' : 'ink-dark');
+    var auto = cfg.olc === '000000';
+    var oc = auto && dark ? 'ffffff' : cfg.olc;
+    var darkA = ui.altInk ? isDarkColor(getComputedStyle(ui.altInk).color) : null;
+    if (darkA === null) darkA = !dark;
+    var ac = auto ? (darkA ? 'ffffff' : '000000') : cfg.olc;
+    var sw = Math.max(1, Math.round(cfg.ol * .6));
+    shadows.push(ring(cfg.ol, oc)); small.push(ring(sw, oc)); alt.push(ring(sw, ac));
+  }
+  else if (hook && hook.outline) { shadows.push(hook.outline(scale)); small.push(hook.outline(scale * .5)); }
+  if (cfg.sh) {
+    var shT = '0 ' + (3 * scale).toFixed(1) + 'px ' + (6 * scale).toFixed(1) + 'px rgba(0,0,0,.6)';
+    shadows.push(shT); small.push(shT); alt.push(shT);
+  }
+  st.setProperty('--tsh', shadows.length ? shadows.join(',') : '0 0 0 transparent');
+  st.setProperty('--tshS', small.length ? small.join(',') : '0 0 0 transparent');
+  st.setProperty('--tshA', alt.length ? alt.join(',') : '0 0 0 transparent');
+}
+
+/* ---------- 設定の適用 (URL / postMessage 共通。リロード不要) ---------- */
+function apply(query) {
+  cfg = CS.effective(CS.parse(query));
+  dz = CS.design(cfg.d) || CS.DESIGNS[0];
+  sup = dz.supports || {};
+  hook = X[dz.id] || null;
+  if (!LG) cfg.lang = 'ja';   /* 辞書が無ければ日本語で描く */
+  /* <html lang> を描画言語に (zh-TW = zh-Hant-TW: 繁体字の字形・フォールバックの選択のため) */
+  var hl = 'ja';
+  if (LG) for (var li = 0; li < LG.LANGS.length; li++) if (LG.LANGS[li].id === cfg.lang) hl = LG.LANGS[li].htmlLang;
+  if (document.documentElement.lang !== hl) document.documentElement.lang = hl;
+  /* 意味のないオプションは無視 */
+  if (sup.lay === false) cfg.lay = 'vr';
+  if (sup.h12 === false) cfg.h12 = 0;
+  if (sup.blink === false) cfg.blink = 0;
+  if (sup.pad === false) cfg.pad = dz.id === 'kotoba' ? 0 : 1;   /* ことば は常に「9時」 */
+  if (sup.ap === false && cfg.ap === 'en') cfg.ap = 'jp';
+  if (dz.id === 'tanzaku' && /^(slash|dot|en)$/.test(cfg.df)) cfg.df = 'jp';   /* 縦書きの短冊は日付を和文 (漢数字) に丸める */         /* 短冊・ことば は「午前/午後」固定 */
+  if (sup.font === false) cfg.font = '';
+  if (sup.anim === false) cfg.anim = 'none';
+  if (sup.ol === false) cfg.ol = 0;
+
+  tzFmt = null;
+  if (cfg.tz) {
+    try {
+      tzFmt = new Intl.DateTimeFormat('en-US', { timeZone: cfg.tz, hourCycle: 'h23', year: 'numeric', month: 'numeric',
+        day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    } catch (e) { tzFmt = null; }
+  }
+
+  var scale = cfg.size / 100;
+  var fid = cfg.font || dz.font;
+  var f = CS.font(fid) || CS.FONTS[0];
+
+  stage.className = 'ax-' + cfg.ax + ' ay-' + cfg.ay;
+  stage.style.padding = Math.round(BASE_PX * scale * .28) + 'px';
+  root.className = 'cs d-' + dz.id + ' lay-' + cfg.lay + ' ax-' + cfg.ax + ' anim-' + cfg.anim +
+    (cfg.date ? ' has-date' : '') + (cfg.label ? ' has-label' : '') + (cfg.sh ? ' sh-on' : '') +
+    (cfg.sec ? ' has-sec' : ' no-sec') + (SINGLE_WEIGHT[f.id] ? ' fw1' : '') + (MONO[f.id] ? ' mono' : '') + ' f-' + f.id;
+  var st = root.style;
+  st.fontSize = (BASE_PX * scale).toFixed(2) + 'px';
+  st.fontFamily = f.css;
+  /* 文字色 (c1) が暗い配色では ink-dark (明るい背景向け: 影を明るい縁取りに切り替えるデザインがある) */
+  var c1hex = cfg.c1 || dz.colors[0] || 'ffffff', c1v = c1hex.match(/../g).map(function (x) { return parseInt(x, 16); });
+  root.classList.toggle('ink-dark', c1v[0] * .299 + c1v[1] * .587 + c1v[2] * .114 < 110);
+  for (var i = 0; i < 3; i++) {
+    var hex = cfg['c' + (i + 1)] || dz.colors[i] || 'ffffff';
+    st.setProperty('--c' + (i + 1), '#' + hex);
+    st.setProperty('--c' + (i + 1) + 'rgb', rgb(hex));
+  }
+  st.setProperty('--shB', cfg.sh ? '0 ' + (4 * scale).toFixed(1) + 'px ' + (14 * scale).toFixed(1) + 'px rgba(0,0,0,.5)' : '0 0 0 transparent');
+
+  txUsed = false;
+  build();
+  outlineVars(scale);
+  render();
+  measure();
+  loadFont(f.id);
+  schedule();
+  notifySize(true);
+}
+
+/* settings.html のプレビューからの設定変更 (リロードせず再適用) */
+window.addEventListener('message', function (e) {
+  var m = e.data;
+  if (m && m.type === 'clock-studio:config' && typeof m.query === 'string') apply(m.query);
+});
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', measure);
+/* 内容の大きさが変わったら (日付が変わった・12時間表示で桁が増えた 等) 親へ通知 */
+if (IN_FRAME && window.ResizeObserver) new ResizeObserver(function () { notifySize(false); }).observe(root);
+
+apply(location.search);
+if (window.parent && window.parent !== window) {
+  try { window.parent.postMessage({ type: 'clock-studio:ready' }, '*'); } catch (e) {}
+}
+})();
+</script>
+</body>
+</html>
