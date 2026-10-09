@@ -6,6 +6,8 @@ OBS のブラウザソースで使える、きせかえできる時計素材で�
 - 無料版 BOOTH ページ（ZIP 版・使い方）: https://amemineamane.booth.pm/items/8958309
 - 有料版（全 100 デザイン・色やフォントの変更・クレジット不要）: https://amemineamane.booth.pm/items/8958119
 
+この Web 版では、利用状況の把握のために Google Analytics でアクセス数を計測しています（BOOTH で配布している ZIP 版には計測は入っていません）。
+
 使い方・利用規約は `README.txt`（日本語）/ `README_en.txt`（English）/ `README_zh-TW.txt`（繁體中文）をご覧ください。
 
 再配布・販売・改変版の配布はご遠慮ください。© 雨峰あまね
